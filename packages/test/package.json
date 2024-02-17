@@ -1,7 +1,7 @@
 {
-  "name": "@gamgee/design",
+  "name": "@gamgee/test",
   "version": "0.0.0",
-  "description": "The design-time components of the Gamgee engine",
+  "description": "Test-time ulitities for the Gamgee engine",
   "main": "index.ts",
   "devDependencies": {
     "@jest/globals": "^29.7.0",

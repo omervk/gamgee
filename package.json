@@ -4,8 +4,8 @@
   "description": "An embedded durable execution engine for TypeScript",
   "main": "index.ts",
   "scripts": {
-    "compile": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "compile": "npm run compile --workspaces",
+    "test": "npm run test --workspaces"
   },
   "author": "Omer van Kloeten",
   "license": "ISC",
@@ -15,7 +15,8 @@
     "typescript-eslint": "^7.0.1"
   },
   "workspaces": [
-    "packages/runtime",
-    "packages/design"
+    "packages/run",
+    "packages/design",
+    "packages/test"
   ]
 }
