@@ -1,0 +1,12 @@
+{
+  "name": "@gamgee/design",
+  "version": "0.0.0",
+  "description": "The design-time components of the Gamgee engine",
+  "main": "index.ts",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Omer van Kloeten",
+  "license": "ISC"
+}
