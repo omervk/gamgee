@@ -2,7 +2,6 @@ import {mermaidToScaffold} from "../src/scaffold";
 
 const fileText: string = `
 ---
-# Required - the name of the workflow
 title: Example Workflow
 ---
 
