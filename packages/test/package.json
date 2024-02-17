@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "description": "Test-time ulitities for the Gamgee engine",
   "main": "index.ts",
+  "dependencies": {
+    "@gamgee/interfaces": "0.0.0"
+  },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
     "@types/jest": "^29.5.12",

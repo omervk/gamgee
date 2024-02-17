@@ -1,0 +1,11 @@
+{
+  "name": "@gamgee/interfaces",
+  "version": "0.0.0",
+  "description": "Interfaces between the different modules of Gamgee",
+  "devDependencies": {},
+  "scripts": {
+    "test": "jest"
+  },
+  "author": "Omer van Kloeten",
+  "license": "ISC"
+}

@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "compile": "npm run compile --workspaces",
-    "test": "npm run test --workspaces"
+    "test": "npm run test --workspaces --if-present"
   },
   "author": "Omer van Kloeten",
   "license": "ISC",
@@ -15,8 +15,9 @@
     "typescript-eslint": "^7.0.1"
   },
   "workspaces": [
-    "packages/run",
     "packages/design",
+    "packages/interfaces",
+    "packages/run",
     "packages/test"
   ]
 }
