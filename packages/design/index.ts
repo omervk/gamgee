@@ -1,7 +1,8 @@
 import {command, run, string as str, positional, option} from 'cmd-ts';
 import {globSync} from "glob";
 import {mermaidToScaffold} from "./src/scaffold";
-import {readFileSync} from "node:fs";
+import {readFileSync, writeFileSync} from "node:fs";
+import * as path from "path";
 
 const cmd = command({
     name: 'mm2ws',
@@ -28,11 +29,12 @@ const cmd = command({
     handler: (args) => {
         const mermaidFiles = globSync(args.sources);
 
-        for (const mermaidFile of mermaidFiles) {
-            console.log(`Converting ${mermaidFile}...`)
-            const contents = readFileSync(mermaidFile, { encoding: 'utf8' });
-            mermaidToScaffold(contents, args.implementationRelativePath)
-            console.log(`Done converting ${mermaidFile}.`)
+        for (const mermaidFilePath of mermaidFiles) {
+            console.log(`Converting ${mermaidFilePath}...`)
+            const mermaidContents = readFileSync(mermaidFilePath, { encoding: 'utf8' });
+            const { generatedFilePath, contents} = mermaidToScaffold(mermaidContents, mermaidFilePath, args.implementationRelativePath);
+            console.log(`Writing ${generatedFilePath}...`)
+            writeFileSync(generatedFilePath, contents)
         }
     },
 });

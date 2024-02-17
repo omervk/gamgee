@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "description": "The design-time components of the Gamgee engine",
   "main": "index.ts",
+  "bin": {
+    "mm2ws": "./bin/mm2ws"
+  },
   "dependencies": {
     "@gamgee/interfaces": "0.0.0",
     "cmd-ts": "^0.13.0",
@@ -21,7 +24,7 @@
   "scripts": {
     "compile": "tsc-silent --project tsconfig.json --suppress 1344@src/diagram/parser.js --compiler ../../node_modules/typescript/lib/typescript.js",
     "test": "jest",
-    "generate-parser": "jison src/diagram/stateDiagram.jison --outfile src/diagram/parser.js --module-type commonjs"
+    "generate": "jison src/diagram/stateDiagram.jison --outfile src/diagram/parser.js --module-type commonjs"
   },
   "author": "Omer van Kloeten",
   "license": "ISC"

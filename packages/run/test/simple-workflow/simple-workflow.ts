@@ -1,5 +1,5 @@
 // This is what is implemented by the user
-import {SimpleWorkflowBase} from './generated.simple-workflow';
+import {SimpleWorkflowBase} from './simple-workflow.generated';
 import {CompleteWorkflow} from "@gamgee/run";
 
 export type MyTaskPayload = string;

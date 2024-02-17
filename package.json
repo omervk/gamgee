@@ -5,7 +5,8 @@
   "main": "index.ts",
   "scripts": {
     "compile": "npm run compile --workspaces",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "generate": "npm run generate --workspaces --if-present"
   },
   "author": "Omer van Kloeten",
   "license": "ISC",

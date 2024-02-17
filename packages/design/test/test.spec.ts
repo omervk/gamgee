@@ -23,8 +23,8 @@ stateDiagram-v2
 
 describe('test', () => {
     it('test', () => {
-        const {fileName, template} = mermaidToScaffold(fileText, ".");
-        console.log(fileName);
-        console.log(template);
+        const {generatedFilePath, contents} = mermaidToScaffold(fileText, "./my-file.ts", ".");
+        console.log(generatedFilePath);
+        console.log(contents);
     })
 });
