@@ -1,4 +1,4 @@
-import {mermaidToScaffold} from "../src/scaffold";
+import { mermaidToScaffold } from '../src/scaffold'
 
 const fileText: string = `
 ---
@@ -18,12 +18,12 @@ stateDiagram-v2
     POST_FIRST_TASK --> thirdTask: Value Isn't Null
     SecondTask --> thirdTask
     thirdTask --> [*]
-`;
+`
 
 describe('test', () => {
     it('test', () => {
-        const {generatedFilePath, contents} = mermaidToScaffold(fileText, "./my-file.ts", ".");
-        console.log(generatedFilePath);
-        console.log(contents);
+        const { generatedFilePath, contents } = mermaidToScaffold(fileText, './my-file.ts', '.')
+        console.log(generatedFilePath)
+        console.log(contents)
     })
-});
+})

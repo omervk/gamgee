@@ -4,7 +4,8 @@
   "description": "Interfaces between the different modules of Gamgee",
   "devDependencies": {},
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "lint": "eslint **/*.ts --fix"
   },
   "author": "Omer van Kloeten",
   "license": "ISC"

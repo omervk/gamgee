@@ -14,7 +14,8 @@
   },
   "scripts": {
     "compile": "tsc --build .",
-    "test": "jest"
+    "test": "jest",
+    "lint": "eslint **/*.ts --fix"
   },
   "author": "Omer van Kloeten",
   "license": "ISC"

@@ -6,12 +6,16 @@
   "scripts": {
     "compile": "npm run compile --workspaces",
     "test": "npm run test --workspaces --if-present",
-    "generate": "npm run generate --workspaces --if-present"
+    "generate": "npm run generate --workspaces --if-present",
+    "lint": "npm run lint --workspaces"
   },
   "author": "Omer van Kloeten",
   "license": "ISC",
   "devDependencies": {
     "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "prettier": "3.2.5",
     "typescript": "^5.3.3",
     "typescript-eslint": "^7.0.1"
   },
