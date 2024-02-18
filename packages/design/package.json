@@ -21,7 +21,7 @@
     "ts-jest": "^29.1.2"
   },
   "scripts": {
-    "compile": "tsc --build .",
+    "compile": "cp ../../tsconfig.json . && tsc --build .",
     "test": "jest",
     "generate": "node ./src/diagram/generate.parser.js",
     "lint": "eslint **/*.ts --fix"

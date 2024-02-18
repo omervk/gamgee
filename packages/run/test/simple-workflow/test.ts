@@ -1,19 +1,25 @@
-import { MyTaskPayload, SimpleWorkflow } from './simple-workflow'
+import { SimpleWorkflow } from './simple-workflow'
 import InMemoryStateStore from '@gamgee/test/stateStores/in-memory'
 import { WorkflowWorker } from '../../src/worker'
 import { FetchStrategy } from '@gamgee/interfaces/store'
-import { CompleteWorkflow } from '../../src/workflow'
-import { afterEach } from '@jest/globals'
+
+function randomString(): string {
+    return Math.random().toString(36).slice(2)
+}
 
 describe('test simple workflow', () => {
-    afterEach(() => {
-        new SimpleWorkflow().postTestCleanup()
-    })
-
-    it('runs the workflow', async () => {
+    it.concurrent('runs the workflow', async () => {
+        // TODO: Document that the workflow instance is ephemeral. State is persisted using the store or side-effects.
         const workflow = new SimpleWorkflow()
         const store = new InMemoryStateStore()
-        await workflow.submit('test', store)
+        const testId = randomString()
+        await workflow.submit(
+            {
+                testId,
+                failuresRequested: 0,
+            },
+            store,
+        )
 
         const worker = new WorkflowWorker()
         const result = await worker.executeWaitingWorkflow(
@@ -29,25 +35,23 @@ describe('test simple workflow', () => {
             tasksRemaining: 0,
             unrecoverableTasks: 0,
         })
-        expect(workflow.getExecutionRegistry()).toStrictEqual(['test'])
+        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
+            failureCount: 0,
+            successCount: 1,
+        })
     })
 
-    it('runs the workflow if the step fails once', async () => {
-        let failureCounter = 0
-
-        const workflow = new (class extends SimpleWorkflow {
-            async myTask(payload: MyTaskPayload): Promise<CompleteWorkflow> {
-                if (failureCounter === 0) {
-                    failureCounter++
-                    throw new Error('Task failed successfully :)')
-                }
-
-                return super.myTask(payload)
-            }
-        })()
-
+    it.concurrent('runs the workflow if the step fails once', async () => {
+        const workflow = new SimpleWorkflow()
         const store = new InMemoryStateStore()
-        await workflow.submit('test', store)
+        const testId = randomString()
+        const uniqueTaskId = await workflow.submit(
+            {
+                testId,
+                failuresRequested: 1,
+            },
+            store,
+        )
 
         const worker = new WorkflowWorker()
         const result = await worker.executeWaitingWorkflow(
@@ -57,46 +61,87 @@ describe('test simple workflow', () => {
             1000,
         )
 
-        expect(result).toStrictEqual('Workflow Completed')
+        expect(result).toStrictEqual('Workflow Stopped')
+        expect(store.getStats()).toStrictEqual({
+            taskUpdatesSeen: 2, // Create, retry
+            tasksRemaining: 1,
+            unrecoverableTasks: 0,
+        })
+        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
+            failureCount: 1,
+            successCount: 0,
+        })
+
+        store.assumingTaskIsWaitingMakeItAvailable(uniqueTaskId)
+
+        const result2 = await worker.executeWaitingWorkflow(
+            store,
+            { workflowType: workflow.workflowType },
+            FetchStrategy.Random,
+            1000,
+        )
+
+        expect(result2).toStrictEqual('Workflow Completed')
         expect(store.getStats()).toStrictEqual({
             taskUpdatesSeen: 3, // Create, retry, done
             tasksRemaining: 0,
             unrecoverableTasks: 0,
         })
-        expect(workflow.getExecutionRegistry()).toStrictEqual(['test'])
+        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
+            failureCount: 1,
+            successCount: 1,
+        })
     })
 
-    it('turns the workflow unrecoverable if the step fails twice', async () => {
-        let failureCounter = 0
-
-        const workflow = new (class extends SimpleWorkflow {
-            async myTask(payload: MyTaskPayload): Promise<CompleteWorkflow> {
-                if (failureCounter < 2) {
-                    failureCounter++
-                    throw new Error('Task failed successfully :)')
-                }
-
-                return super.myTask(payload)
-            }
-        })()
-
+    it.concurrent('turns the workflow unrecoverable if the step fails twice', async () => {
+        const workflow = new SimpleWorkflow()
         const store = new InMemoryStateStore()
-        await workflow.submit('test', store)
+        const testId = randomString()
+        const uniqueTaskId = await workflow.submit(
+            {
+                testId,
+                failuresRequested: 2,
+            },
+            store,
+        )
 
         const worker = new WorkflowWorker()
-        const result = await worker.executeWaitingWorkflow(
+        const attempt1 = await worker.executeWaitingWorkflow(
             store,
             { workflowType: workflow.workflowType },
             FetchStrategy.Random,
             1000,
         )
 
-        expect(result).toStrictEqual('Workflow Unrecoverable')
+        expect(attempt1).toStrictEqual('Workflow Stopped')
+        expect(store.getStats()).toStrictEqual({
+            taskUpdatesSeen: 2, // Create, retry
+            tasksRemaining: 1,
+            unrecoverableTasks: 0,
+        })
+        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
+            failureCount: 1,
+            successCount: 0,
+        })
+
+        store.assumingTaskIsWaitingMakeItAvailable(uniqueTaskId)
+
+        const attempt2 = await worker.executeWaitingWorkflow(
+            store,
+            { workflowType: workflow.workflowType },
+            FetchStrategy.Random,
+            1000,
+        )
+
+        expect(attempt2).toStrictEqual('Workflow Unrecoverable')
         expect(store.getStats()).toStrictEqual({
             taskUpdatesSeen: 3, // Create, retry, permanent failure
             tasksRemaining: 0,
             unrecoverableTasks: 1,
         })
-        expect(workflow.getExecutionRegistry()).toStrictEqual([])
+        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
+            failureCount: 2,
+            successCount: 0,
+        })
     })
 })

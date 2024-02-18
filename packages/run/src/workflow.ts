@@ -25,6 +25,8 @@ type StepDefinition<T, R extends StepResult> = {
     backoffMs: number
 }
 
+export type WorkflowExecutionResult = 'Workflow Completed' | 'Workflow Stopped' | 'Workflow Unrecoverable'
+
 export abstract class WorkflowBase {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private readonly steps: { [name: string]: Omit<StepDefinition<any, StepResult>, 'name'> } = {}
@@ -38,24 +40,26 @@ export abstract class WorkflowBase {
         this.steps[def.name] = Object.assign({}, def, { run: def.run.bind(this) })
     }
 
-    async _runTask(
-        task: WorkflowTask,
-        store: StateStore,
-    ): Promise<WorkflowTask | 'Workflow Completed' | 'Workflow Unrecoverable'> {
+    async _runTask(task: WorkflowTask, store: StateStore): Promise<WorkflowTask | WorkflowExecutionResult> {
         // TODO: Validate stuff
         const stepDef = this.steps[task.taskName]
-        const payload = JSON.parse(task.serializedPayload)
 
         try {
             // TODO: On failure, increment attempts counter and persist
-            const result = await stepDef.run(payload)
+            const result = await stepDef.run(task.payload)
 
             if (result.targetTaskName === null) {
-                await store.clearTask(task.id)
+                await store.clearTask(task.instanceId)
                 return 'Workflow Completed'
             }
 
-            return await this._enqueueImpl(result.targetTaskName, result.payload, store, task.id)
+            return await this._enqueueImpl(store, {
+                instanceId: task.instanceId,
+                typeId: this.workflowType,
+                taskName: result.targetTaskName, // TODO: Clearly separate between Task and Step
+                payload: result.payload,
+                attempts: 0,
+            })
         } catch (e) {
             // TODO: Notify of failure
 
@@ -66,7 +70,20 @@ export abstract class WorkflowBase {
                 return 'Workflow Unrecoverable'
             }
 
-            return await this._enqueueImpl(task.taskName, payload, store, task.id, attemptsThatHappened)
+            // For context see https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
+            const exponentialBackoffWithFullJitterMs =
+                Math.random() * stepDef.backoffMs * Math.pow(attemptsThatHappened, 2)
+
+            await this._enqueueImpl(store, {
+                instanceId: task.instanceId,
+                typeId: this.workflowType,
+                taskName: task.taskName,
+                payload: task.payload,
+                attempts: attemptsThatHappened,
+                onlyRunAfterTsMs: Date.now() + exponentialBackoffWithFullJitterMs,
+            })
+
+            return 'Workflow Stopped'
         }
     }
 
@@ -74,29 +91,21 @@ export abstract class WorkflowBase {
         taskName: string,
         payload: JSONValue,
         store: StateStore,
-        taskId?: string,
-        attemptsMade: number = 0,
+        instanceId: string = Math.random().toString(36).slice(2),
     ): Promise<WorkflowTask> {
-        return await this._enqueueImpl(taskName, payload, store, taskId, attemptsMade)
-    }
-
-    private async _enqueueImpl(
-        taskName: string,
-        payload: JSONValue,
-        store: StateStore,
-        taskId?: string,
-        attemptsMade: number = 0,
-    ) {
         const newTask: WorkflowTask = {
-            id: taskId ?? Math.random().toString(36).slice(2),
+            instanceId,
             typeId: this.workflowType,
             taskName,
-            serializedPayload: JSON.stringify(payload),
-            attempts: attemptsMade,
+            payload,
+            attempts: 0,
         }
 
-        await store.upsertTask(newTask)
+        return await this._enqueueImpl(store, newTask)
+    }
 
+    private async _enqueueImpl(store: StateStore, newTask: WorkflowTask): Promise<WorkflowTask> {
+        await store.upsertTask(newTask)
         return newTask
     }
 }

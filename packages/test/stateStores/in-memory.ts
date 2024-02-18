@@ -7,7 +7,7 @@ export default class InMemoryStateStore implements StateStore {
     private readonly unrecoverableTasks: { [id: string]: WorkflowTask } = {}
 
     async upsertTask(newTask: WorkflowTask): Promise<void> {
-        this.tasks[newTask.id] = Object.assign({ clock: this.clock }, newTask)
+        this.tasks[newTask.instanceId] = Object.assign({ clock: this.clock }, newTask)
         this.clock++
         return Promise.resolve()
     }
@@ -59,11 +59,17 @@ export default class InMemoryStateStore implements StateStore {
                 return false
             }
 
+            const now = Date.now()
+
+            if ((task.onlyRunAfterTsMs ?? 0) > now) {
+                return false
+            }
+
             return true
         })
     }
 
-    async clearTask(id: WorkflowTask['id']): Promise<void> {
+    async clearTask(id: WorkflowTask['instanceId']): Promise<void> {
         delete this.tasks[id]
         this.clock++
         return Promise.resolve()
@@ -78,8 +84,8 @@ export default class InMemoryStateStore implements StateStore {
     }
 
     async registerUnrecoverable(task: WorkflowTask): Promise<void> {
-        await this.clearTask(task.id)
-        this.unrecoverableTasks[task.id] = task
+        await this.clearTask(task.instanceId)
+        this.unrecoverableTasks[task.instanceId] = task
     }
 
     async recoverTasks(
@@ -94,10 +100,22 @@ export default class InMemoryStateStore implements StateStore {
             // Reset the attempts counter, since this is a recovered task
             const recoveredTask: WorkflowTask = Object.assign({}, task, { attempts: 0 })
             await this.upsertTask(recoveredTask)
-            delete this.unrecoverableTasks[task.id]
+            delete this.unrecoverableTasks[task.instanceId]
             recoveredTasks.push(recoveredTask)
         }
 
         return tasksToRecover
+    }
+
+    assumingTaskIsWaitingMakeItAvailable(taskInstanceId: string): void {
+        if (!this.tasks[taskInstanceId]) {
+            throw new Error(`Expected task ${taskInstanceId} to be waiting, but it doesn't exist.`)
+        }
+
+        if (!this.tasks[taskInstanceId].onlyRunAfterTsMs) {
+            throw new Error(`Expected task ${taskInstanceId} to be waiting, but it's not.`)
+        }
+
+        this.tasks[taskInstanceId] = Object.assign({}, this.tasks[taskInstanceId], { onlyRunAfterTsMs: undefined })
     }
 }

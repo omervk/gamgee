@@ -22,7 +22,7 @@ export interface StateStore {
     /**
      * Remove the task from state. This may be implemented as a soft deletion.
      */
-    clearTask(id: WorkflowTask['id']): Promise<void>
+    clearTask(id: WorkflowTask['instanceId']): Promise<void>
 
     /**
      * Register the task as unrecoverable and remove it from the list of waiting tasks.

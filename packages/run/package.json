@@ -16,7 +16,7 @@
   },
   "scripts": {
     "generate": "mm2ws test/**/*.mermaid",
-    "compile": "tsc --build .",
+    "compile": "cp ../../tsconfig.json . && tsc --build .",
     "test": "jest",
     "lint": "eslint **/*.ts --fix"
   },
