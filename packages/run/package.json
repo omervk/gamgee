@@ -17,7 +17,7 @@
   "scripts": {
     "generate": "mm2ws test/**/*.mermaid",
     "compile": "tsc --build .",
-    "test": "jest",
+    "test": "jest --config=../../jest.config.js",
     "lint": "eslint **/*.ts --fix"
   },
   "author": "Omer van Kloeten",

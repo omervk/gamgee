@@ -3,7 +3,6 @@ import { WorkflowTask } from './task'
 export enum FetchStrategy {
     Newest = 'LIFO',
     Oldest = 'FIFO',
-    Drain = 'Drain', // Pick up everything except for first tasks. TODO: How should this be implemented this time?
 }
 
 export type Query = Partial<{ workflowType: string; taskName: string; strategy: FetchStrategy }>

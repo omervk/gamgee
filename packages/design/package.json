@@ -23,7 +23,7 @@
   },
   "scripts": {
     "compile": "tsc-silent --project tsconfig.json --suppress 1344@src/diagram/parser.js --compiler ../../node_modules/typescript/lib/typescript.js",
-    "test": "jest",
+    "test": "jest --config=../../jest.config.js",
     "generate": "jison src/diagram/stateDiagram.jison --outfile src/diagram/parser.js --module-type commonjs",
     "lint": "eslint **/*.ts --fix"
   },

@@ -9,7 +9,15 @@ class WorkflowFactory {
     }
 
     create(workflowType: string) {
-        return this.workflows[workflowType]()
+        const workflowCreator = this.workflows[workflowType]
+
+        if (!workflowCreator) {
+            throw new Error(
+                `Unable to initialize workflow of type ${workflowType}. Please check that it was registered by the generated code.`,
+            )
+        }
+
+        return workflowCreator()
     }
 }
 
