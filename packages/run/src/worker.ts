@@ -1,5 +1,5 @@
 import { workflowFactory } from './workflow-factory'
-import { Query, StateStore } from '@gamgee/interfaces/store'
+import { FetchStrategy, Query, StateStore } from '@gamgee/interfaces/store'
 import { WorkflowTask } from '@gamgee/interfaces/task'
 
 // TODO: Task locking 🤔
@@ -8,9 +8,10 @@ export class WorkflowWorker {
     async executeWaitingTask(
         store: StateStore,
         query: Query,
+        fetchStrategy: FetchStrategy,
         fetchTimeoutMs: number,
-    ): Promise<WorkflowTask | 'Workflow Completed' | 'No Tasks Waiting'> {
-        const maybeTask = await store.tryFetchingTask(query, fetchTimeoutMs)
+    ): Promise<WorkflowTask | 'Workflow Completed' | 'Workflow Unrecoverable' | 'No Tasks Waiting'> {
+        const maybeTask = await store.tryFetchingTask(query, fetchStrategy, fetchTimeoutMs)
 
         if (maybeTask === null) {
             return 'No Tasks Waiting'
@@ -24,9 +25,10 @@ export class WorkflowWorker {
     async executeWaitingWorkflow(
         store: StateStore,
         query: Query,
+        fetchStrategy: FetchStrategy,
         fetchTimeoutMs: number,
-    ): Promise<'Workflow Completed' | 'No Tasks Waiting'> {
-        const maybeTask = await store.tryFetchingTask(query, fetchTimeoutMs)
+    ): Promise<'Workflow Completed' | 'Workflow Unrecoverable' | 'No Tasks Waiting'> {
+        const maybeTask = await store.tryFetchingTask(query, fetchStrategy, fetchTimeoutMs)
 
         if (maybeTask === null) {
             return 'No Tasks Waiting'
@@ -34,11 +36,13 @@ export class WorkflowWorker {
 
         const workflow = workflowFactory.create(maybeTask.typeId)
 
-        async function executeUntilComplete(task: WorkflowTask): Promise<'Workflow Completed' | 'No Tasks Waiting'> {
+        async function executeUntilComplete(
+            task: WorkflowTask,
+        ): Promise<'Workflow Completed' | 'Workflow Unrecoverable' | 'No Tasks Waiting'> {
             const result = await workflow._runTask(task, store)
 
-            if (result === 'Workflow Completed') {
-                return 'Workflow Completed'
+            if (result === 'Workflow Completed' || result === 'Workflow Unrecoverable') {
+                return result
             }
 
             return await executeUntilComplete(result)

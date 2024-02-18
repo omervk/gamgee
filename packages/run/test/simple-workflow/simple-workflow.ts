@@ -1,21 +1,25 @@
-import {SimpleWorkflowBase} from './simple-workflow.generated';
-import {CompleteWorkflow} from "@gamgee/run";
+import { SimpleWorkflowBase } from './simple-workflow.generated'
+import { CompleteWorkflow } from '@gamgee/run'
 
-export type MyTaskPayload = string;
+export type MyTaskPayload = string
 
-const executionRegistry: MyTaskPayload[] = [];
+const executionRegistry: MyTaskPayload[] = []
 
 export class SimpleWorkflow extends SimpleWorkflowBase {
     constructor() {
-        super();
+        super()
     }
 
     async myTask(payload: MyTaskPayload): Promise<CompleteWorkflow> {
-        executionRegistry.push(payload);
-        return CompleteWorkflow;
+        executionRegistry.push(payload)
+        return CompleteWorkflow
     }
-    
+
     getExecutionRegistry(): MyTaskPayload[] {
-        return executionRegistry;
+        return executionRegistry
+    }
+
+    postTestCleanup(): void {
+        while (executionRegistry.pop());
     }
 }

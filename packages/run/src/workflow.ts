@@ -31,26 +31,43 @@ export abstract class WorkflowBase {
 
     protected constructor(readonly workflowType: string) {
         // TODO: When trying to register two distinct implementations with the same name, throw (e.g. use a hash in the generated file)
-        workflowFactory.register(workflowType, () => new (this.constructor as new () => this)()) // TODO: This probably should work?
+        workflowFactory.register(workflowType, () => new (this.constructor as new () => this)())
     }
 
     protected _registerStep<T extends JSONValue, R extends StepResult>(def: StepDefinition<T, R>): void {
         this.steps[def.name] = Object.assign({}, def, { run: def.run.bind(this) })
     }
 
-    async _runTask(task: WorkflowTask, store: StateStore): Promise<WorkflowTask | 'Workflow Completed'> {
+    async _runTask(
+        task: WorkflowTask,
+        store: StateStore,
+    ): Promise<WorkflowTask | 'Workflow Completed' | 'Workflow Unrecoverable'> {
         // TODO: Validate stuff
         const stepDef = this.steps[task.taskName]
+        const payload = JSON.parse(task.serializedPayload)
 
-        // TODO: On failure, increment attempts counter and persist
-        const result = await stepDef.run(JSON.parse(task.serializedPayload))
+        try {
+            // TODO: On failure, increment attempts counter and persist
+            const result = await stepDef.run(payload)
 
-        if (result.targetTaskName === null) {
-            await store.clearTask(task.id)
-            return 'Workflow Completed'
+            if (result.targetTaskName === null) {
+                await store.clearTask(task.id)
+                return 'Workflow Completed'
+            }
+
+            return await this._enqueueImpl(result.targetTaskName, result.payload, store, task.id)
+        } catch (e) {
+            // TODO: Notify of failure
+
+            const attemptsThatHappened = task.attempts + 1
+
+            if (stepDef.attempts <= attemptsThatHappened) {
+                await store.registerUnrecoverable(task)
+                return 'Workflow Unrecoverable'
+            }
+
+            return await this._enqueueImpl(task.taskName, payload, store, task.id, attemptsThatHappened)
         }
-
-        return await this._enqueue(result.targetTaskName, result.payload, store, task.id)
     }
 
     protected async _enqueue(
@@ -58,12 +75,24 @@ export abstract class WorkflowBase {
         payload: JSONValue,
         store: StateStore,
         taskId?: string,
+        attemptsMade: number = 0,
     ): Promise<WorkflowTask> {
+        return await this._enqueueImpl(taskName, payload, store, taskId, attemptsMade)
+    }
+
+    private async _enqueueImpl(
+        taskName: string,
+        payload: JSONValue,
+        store: StateStore,
+        taskId?: string,
+        attemptsMade: number = 0,
+    ) {
         const newTask: WorkflowTask = {
             id: taskId ?? Math.random().toString(36).slice(2),
             typeId: this.workflowType,
             taskName,
             serializedPayload: JSON.stringify(payload),
+            attempts: attemptsMade,
         }
 
         await store.upsertTask(newTask)
