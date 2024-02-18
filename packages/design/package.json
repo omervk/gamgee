@@ -22,7 +22,7 @@
   },
   "scripts": {
     "compile": "tsc --build .",
-    "test": "jest --config=../../jest.config.js",
+    "test": "jest",
     "generate": "node ./src/diagram/generate.parser.js",
     "lint": "eslint **/*.ts --fix"
   },
