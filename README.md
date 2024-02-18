@@ -6,6 +6,12 @@
 
 An embedded framework to lend you a helping durable execution hand on your journey.
 
+## Philosophy
+
+<img src="./resources/tradeoffs.jpg" width="256" height="auto" />
+
+This is being built to be lightweight, testable, localized/embedded and as type safe as I can make it. Workers should expect an influx of requests, and it’s preferable they be persistent and durable (can get an item, work on it, get the next item, etc.). The classic use case is a streaming-like business flow, where a streaming framework like Kafka Streams is overkill, and where each step is a single(?) idempotent IO call.
+
 # WARNING: DO NOT USE!
 
 This is very much a work in progress. Not even published to npm.
