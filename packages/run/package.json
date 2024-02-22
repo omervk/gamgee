@@ -15,7 +15,7 @@
     "ts-jest": "^29.1.2"
   },
   "scripts": {
-    "generate": "mm2ws test/**/*.mermaid ; mm2ws docs/examples/**/*.mermaid",
+    "generate": "mm2ws '{test,docs/examples}/**/*.mermaid'",
     "compile": "cp ../../tsconfig.json . && tsc --build .",
     "test": "jest",
     "lint": "eslint **/*.ts --fix"
