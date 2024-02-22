@@ -29,7 +29,8 @@ parser.yy = {
 }
 
 const NoOutgoingConnection = '???'
-const EndState = '[*]'
+
+const EndState = { type: 'end-state', name: '[*]' }
 
 type Step = {
     name: string
@@ -107,7 +108,7 @@ function inferStepsAndDecisions(diagramStatements: Statement[]): {
                 // First step
                 if (firstStep !== null) {
                     throw new Error(
-                        `Unable to have multiple first steps. Only one step may arrive from [*]. Found another at: ${JSON.stringify(statement)}`,
+                        `Unable to have multiple first steps. Only one step may arrive from [*]. Found both ${firstStep} and ${statement.state2.id}.`,
                     )
                 }
 
@@ -125,9 +126,11 @@ function inferStepsAndDecisions(diagramStatements: Statement[]): {
                         whatsNext: NoOutgoingConnection,
                     }
 
-                    if (steps[from].whatsNext !== NoOutgoingConnection && from !== to) {
+                    const whatsNext = steps[from].whatsNext
+
+                    if (whatsNext !== NoOutgoingConnection && from !== to) {
                         throw new Error(
-                            `Only one relation may leave a non-decision step. The step ${from} is related to both of the steps ${JSON.stringify(steps[from].whatsNext)} and ${to}.`,
+                            `Only one relation may leave a non-decision step. The step ${from} is related to both of the steps ${whatsNext.name} and ${to}.`,
                         )
                     }
                 }
@@ -151,22 +154,21 @@ function inferStepsAndDecisions(diagramStatements: Statement[]): {
             }
 
             if (fromDecision) {
+                if (from === to) {
+                    throw new Error(
+                        `Decisions may not have self-arrows. The decision ${statement.state1.id} connects to itself.`,
+                    )
+                }
+
                 if (toDecision) {
                     throw new Error(
                         `A decision can not be directly connected to another decision. There is a connection between ${from} and ${to}.`,
                     )
                 }
 
-                // This is a relation coming out of a decision
-                if (from === to) {
-                    throw new Error(
-                        `Decisions may not have self-arrows. The following relation has one: ${JSON.stringify(statement)}`,
-                    )
-                }
-
                 if (statement.description === undefined) {
                     throw new Error(
-                        `All relations coming out of decisions must be named. The following relation is unnamed: ${JSON.stringify(statement)}`,
+                        `All relations coming out of decisions must be named. The relation from ${from} to ${statement.state2.id} is unnamed.`,
                     )
                 }
 
@@ -178,7 +180,7 @@ function inferStepsAndDecisions(diagramStatements: Statement[]): {
                 // This is a self-arrow
                 if (statement.description === undefined) {
                     throw new Error(
-                        `Self-arrows must include information about retries. The following relation is unnamed: ${JSON.stringify(statement)}`,
+                        `Self-arrows must include information about retries. The self-arrow on ${from} provides no information.`,
                     )
                 }
 
@@ -195,6 +197,12 @@ function inferStepsAndDecisions(diagramStatements: Statement[]): {
                 if (parameters.attempts) {
                     const attempts = Number.parseFloat(parameters.attempts)
 
+                    if (Number.isNaN(attempts)) {
+                        throw new Error(
+                            `Number of attempts for ${from} is not a number. Only whole positive numbers are allowed.`,
+                        )
+                    }
+
                     if (attempts <= 0 || Math.floor(attempts) !== attempts) {
                         throw new Error(
                             `Number of attempts for ${from} is ${attempts}. Only whole positive numbers are allowed.`,
@@ -206,6 +214,12 @@ function inferStepsAndDecisions(diagramStatements: Statement[]): {
 
                 if (parameters.backoffMs) {
                     const backoffMs = Number.parseFloat(parameters.backoffMs)
+
+                    if (Number.isNaN(backoffMs)) {
+                        throw new Error(
+                            `backoffMs for ${from} is not a number. Only whole positive numbers are allowed.`,
+                        )
+                    }
 
                     if (backoffMs <= 0 || Math.floor(backoffMs) !== backoffMs) {
                         throw new Error(
@@ -231,7 +245,7 @@ function inferStepsAndDecisions(diagramStatements: Statement[]): {
 
     if (stepsWithoutOutgoingConnections.length > 0) {
         throw new Error(
-            `The following steps have no outgoing connections and must be connected to the end state [*] explicitly: ${stepsWithoutOutgoingConnections.join(', ')}`,
+            `The following steps have no outgoing connections and must be connected to the end state [*] explicitly: ${stepsWithoutOutgoingConnections.join(', ')}.`,
         )
     }
 
@@ -355,6 +369,10 @@ export function mermaidToScaffold(
     const output = parser.parse(diagramBody)
 
     const { firstStep, steps, decisions } = inferStepsAndDecisions(output)
+
+    if (steps.length === 0) {
+        throw new Error('Diagram has no steps that end in the end state [*].')
+    }
 
     const decisionTypesCode: string[] = decisions.map(d => typeCodeFromDecision(d))
     const registerStepCalls: string[] = steps.map(s => registerStepCallCodeFromStep(s))
