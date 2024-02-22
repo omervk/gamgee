@@ -1,5 +1,6 @@
 import { CompleteWorkflow } from '@gamgee/run'
 import { ChoiceDecision, ConditionsWorkflowBase } from './conditions.generated'
+import { trace } from '@opentelemetry/api'
 
 export type DecidePayload = {
     testId: string
@@ -18,10 +19,9 @@ export type LeftPayload = {
 
 export type RightPayload = LeftPayload
 
-type Counters = { failureCount: number; successCount: number }
-type ExecutionInfo = { decide: Counters; left?: Counters; right?: Counters }
+type Failures = { decide: number; left?: number; right?: number }
 
-const executionRegistry: { [testId: string]: ExecutionInfo } = {}
+const failures: { [testId: string]: Failures } = {}
 
 export class ConditionsWorkflow extends ConditionsWorkflowBase {
     constructor() {
@@ -29,19 +29,20 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
     }
 
     async decide(payload: DecidePayload): Promise<ChoiceDecision> {
-        const executionInfo = (executionRegistry[payload.testId] ??= {
-            decide: {
-                failureCount: 0,
-                successCount: 0,
-            },
+        trace.getActiveSpan()?.setAttributes({
+            testId: payload.testId,
+            choose: payload.choose,
+            failuresRequested: payload.failuresRequested.decideFailures,
         })
 
-        if (executionInfo.decide.failureCount < payload.failuresRequested.decideFailures) {
-            executionInfo.decide.failureCount++
+        const knownFailures = (failures[payload.testId] ??= {
+            decide: 0,
+        })
+
+        if (knownFailures.decide < payload.failuresRequested.decideFailures) {
+            knownFailures.decide++
             throw new Error('Task failed successfully :)')
         }
-
-        executionInfo.decide.successCount++
 
         return payload.choose === 'left'
             ? Promise.resolve({
@@ -57,38 +58,34 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
     }
 
     left(payload: LeftPayload): Promise<CompleteWorkflow> {
-        const executionInfo = (executionRegistry[payload.testId].left = {
-            failureCount: 0,
-            successCount: 0,
+        trace.getActiveSpan()?.setAttributes({
+            testId: payload.testId,
+            failuresRequested: payload.failuresRequested,
         })
 
-        if (executionInfo.failureCount < payload.failuresRequested) {
-            executionInfo.failureCount++
+        failures[payload.testId].left = 0
+
+        if (failures[payload.testId].left! < payload.failuresRequested) {
+            failures[payload.testId].left!++
             throw new Error('Task failed successfully :)')
         }
-
-        executionInfo.successCount++
 
         return Promise.resolve(CompleteWorkflow)
     }
 
     right(payload: RightPayload): Promise<CompleteWorkflow> {
-        const executionInfo = (executionRegistry[payload.testId].right = {
-            failureCount: 0,
-            successCount: 0,
+        trace.getActiveSpan()?.setAttributes({
+            testId: payload.testId,
+            failuresRequested: payload.failuresRequested,
         })
 
-        if (executionInfo.failureCount < payload.failuresRequested) {
-            executionInfo.failureCount++
+        failures[payload.testId].right = 0
+
+        if (failures[payload.testId].right! < payload.failuresRequested) {
+            failures[payload.testId].right!++
             throw new Error('Task failed successfully :)')
         }
 
-        executionInfo.successCount++
-
         return Promise.resolve(CompleteWorkflow)
-    }
-
-    getExecutionRegistry(): typeof executionRegistry {
-        return executionRegistry
     }
 }

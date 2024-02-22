@@ -1,14 +1,13 @@
 import { SimpleWorkflowBase } from './simple-workflow.generated'
 import { CompleteWorkflow } from '@gamgee/run'
+import { trace } from '@opentelemetry/api'
 
 export type MyTaskPayload = {
     testId: string
     failuresRequested: number
 }
 
-type ExecutionInfo = { failureCount: number; successCount: number }
-
-const executionRegistry: { [id: MyTaskPayload['testId']]: ExecutionInfo } = {}
+const failures: { [id: MyTaskPayload['testId']]: number } = {}
 
 export class SimpleWorkflow extends SimpleWorkflowBase {
     constructor() {
@@ -16,21 +15,13 @@ export class SimpleWorkflow extends SimpleWorkflowBase {
     }
 
     async myTask(payload: MyTaskPayload): Promise<CompleteWorkflow> {
-        const executionInfo = (executionRegistry[payload.testId] ??= {
-            failureCount: 0,
-            successCount: 0,
-        })
+        trace.getActiveSpan()?.setAttribute('payload', payload.testId)
 
-        if (executionInfo.failureCount < payload.failuresRequested) {
-            executionInfo.failureCount++
+        if ((failures[payload.testId] ??= 0) < payload.failuresRequested) {
+            failures[payload.testId]++
             throw new Error('Task failed successfully :)')
         }
 
-        executionInfo.successCount++
         return Promise.resolve(CompleteWorkflow)
-    }
-
-    getExecutionRegistry(): typeof executionRegistry {
-        return executionRegistry
     }
 }

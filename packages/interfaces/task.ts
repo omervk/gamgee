@@ -32,4 +32,9 @@ export type WorkflowTask = {
      * Usually used by the exponential backoff algorithm, but may also be used to schedule workflows.
      */
     readonly onlyRunAfterTsMs?: number
+
+    /**
+     * OpenTelemetry context, propagated to the next task.
+     */
+    readonly otelContext: { traceparent: string; tracestate: string }
 }

@@ -2,6 +2,7 @@ import { JSONValue } from '@gamgee/interfaces/json'
 import { StateStore } from '@gamgee/interfaces/store'
 import { WorkflowTask } from '@gamgee/interfaces/task'
 import { workflowFactory } from './workflow-factory'
+import { context, propagation, Span, SpanStatusCode, trace } from '@opentelemetry/api'
 
 export class WrongTimingError extends Error {
     constructor() {
@@ -27,6 +28,12 @@ type StepDefinition<T, R extends StepResult> = {
 
 export type WorkflowExecutionResult = 'Workflow Completed' | 'Workflow Stopped' | 'Workflow Unrecoverable'
 
+function getCurrentOTelContext(): { traceparent: string; tracestate: string } {
+    const otelContext = {}
+    propagation.inject(context.active(), otelContext)
+    return otelContext as { traceparent: string; tracestate: string }
+}
+
 export abstract class WorkflowBase {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private readonly steps: { [name: string]: Omit<StepDefinition<any, StepResult>, 'name'> } = {}
@@ -44,47 +51,67 @@ export abstract class WorkflowBase {
         // TODO: Validate stuff
         const stepDef = this.steps[task.taskName]
 
-        try {
-            // TODO: On failure, increment attempts counter and persist
-            const result = await stepDef.run(task.payload)
+        return await trace.getTracer('@gamgee/run').startActiveSpan(
+            `${task.typeId}.${task.taskName}`,
+            {
+                attributes: {},
+            },
+            propagation.extract(context.active(), task.otelContext),
+            async (span: Span) => {
+                try {
+                    const result = await stepDef.run(task.payload)
 
-            if (result.targetTaskName === null) {
-                await store.clearTask(task.instanceId)
-                return 'Workflow Completed'
-            }
+                    if (result.targetTaskName === null) {
+                        await store.clearTask(task.instanceId)
+                        span.setStatus({ code: SpanStatusCode.OK, message: 'Workflow Completed' })
+                        return 'Workflow Completed'
+                    }
 
-            return await this._enqueueImpl(store, {
-                instanceId: task.instanceId,
-                typeId: this.workflowType,
-                taskName: result.targetTaskName, // TODO: Clearly separate between Task and Step
-                payload: result.payload,
-                attempts: 0,
-            })
-        } catch (e) {
-            // TODO: Notify of failure
+                    const nextTask = await this._enqueueImpl(store, {
+                        instanceId: task.instanceId,
+                        typeId: this.workflowType,
+                        taskName: result.targetTaskName, // TODO: Clearly separate between Task and Step
+                        payload: result.payload,
+                        attempts: 0,
+                        otelContext: getCurrentOTelContext(),
+                    })
 
-            const attemptsThatHappened = task.attempts + 1
+                    span.setStatus({ code: SpanStatusCode.OK, message: `Continuing to ${result.targetTaskName}` })
+                    return nextTask
+                } catch (e) {
+                    // TODO: Notify of failure
+                    // @ts-expect-error We won't make assumptions about the type here
+                    // because the implementation checks it anyway
+                    span.recordException(e)
 
-            if (stepDef.attempts <= attemptsThatHappened) {
-                await store.registerUnrecoverable(task)
-                return 'Workflow Unrecoverable'
-            }
+                    const attemptsThatHappened = task.attempts + 1
 
-            // For context see https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
-            const exponentialBackoffWithFullJitterMs =
-                Math.random() * stepDef.backoffMs * Math.pow(attemptsThatHappened, 2)
+                    if (stepDef.attempts <= attemptsThatHappened) {
+                        await store.registerUnrecoverable(task)
+                        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Workflow Unrecoverable' })
+                        return 'Workflow Unrecoverable'
+                    }
 
-            await this._enqueueImpl(store, {
-                instanceId: task.instanceId,
-                typeId: this.workflowType,
-                taskName: task.taskName,
-                payload: task.payload,
-                attempts: attemptsThatHappened,
-                onlyRunAfterTsMs: Date.now() + exponentialBackoffWithFullJitterMs,
-            })
+                    // For context see https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/
+                    const exponentialBackoffWithFullJitterMs =
+                        Math.random() * stepDef.backoffMs * Math.pow(attemptsThatHappened, 2)
 
-            return 'Workflow Stopped'
-        }
+                    await this._enqueueImpl(
+                        store,
+                        Object.assign({}, task, {
+                            attempts: attemptsThatHappened,
+                            onlyRunAfterTsMs: Date.now() + exponentialBackoffWithFullJitterMs,
+                        }),
+                    )
+
+                    span.setStatus({ code: SpanStatusCode.ERROR })
+
+                    return 'Workflow Stopped'
+                } finally {
+                    span.end()
+                }
+            },
+        )
     }
 
     protected async _enqueue(
@@ -99,6 +126,7 @@ export abstract class WorkflowBase {
             taskName,
             payload,
             attempts: 0,
+            otelContext: getCurrentOTelContext(),
         }
 
         return await this._enqueueImpl(store, newTask)

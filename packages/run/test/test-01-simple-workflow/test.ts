@@ -2,146 +2,207 @@ import { SimpleWorkflow } from './simple-workflow'
 import InMemoryStateStore from '@gamgee/test/stateStores/in-memory'
 import { WorkflowWorker } from '../../src/worker'
 import { FetchStrategy } from '@gamgee/interfaces/store'
+import { NodeSDK } from '@opentelemetry/sdk-node'
+import { TestsTraceExporter } from '../tests-trace-exporter'
+import { Span, SpanStatusCode, trace } from '@opentelemetry/api'
+import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
+import { expect } from '@jest/globals'
 
 function randomString(): string {
     return Math.random().toString(36).slice(2)
 }
 
 describe('test simple workflow', () => {
+    const testsTraceExporter = new TestsTraceExporter()
+    const sdk: NodeSDK = new NodeSDK({
+        spanProcessor: new SimpleSpanProcessor(testsTraceExporter),
+    })
+    sdk.start()
+
+    afterAll(async () => {
+        await sdk.shutdown()
+    })
+
     it.concurrent('runs the workflow', async () => {
-        // TODO: Document that the workflow instance is ephemeral. State is persisted using the store or side-effects.
-        const workflow = new SimpleWorkflow()
-        const store = new InMemoryStateStore()
         const testId = randomString()
-        await workflow.submit(
-            {
-                testId,
-                failuresRequested: 0,
-            },
-            store,
-        )
+        const store = new InMemoryStateStore()
 
-        const worker = new WorkflowWorker()
-        const result = await worker.executeWaitingWorkflow(
-            store,
-            { workflowType: workflow.workflowType },
-            FetchStrategy.Random,
-            1000,
-        )
+        const parentSpanContext = await trace
+            .getTracer('test')
+            .startActiveSpan(expect.getState().currentTestName!, { root: true }, async (span: Span) => {
+                // TODO: Document that the workflow instance is ephemeral. State is persisted using the store or side-effects.
+                const workflow = new SimpleWorkflow()
+                await workflow.submit(
+                    {
+                        testId,
+                        failuresRequested: 0,
+                    },
+                    store,
+                )
 
-        expect(result).toStrictEqual('Workflow Completed')
+                const worker = new WorkflowWorker()
+                const result = await worker.executeWaitingWorkflow(
+                    store,
+                    { workflowType: workflow.workflowType },
+                    FetchStrategy.Random,
+                    1000,
+                )
+
+                expect(result).toStrictEqual('Workflow Completed')
+
+                return span.spanContext()
+            })
+
         expect(store.getStats()).toStrictEqual({
             taskUpdatesSeen: 2, // Create, done
             tasksRemaining: 0,
             unrecoverableTasks: 0,
         })
-        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
-            failureCount: 0,
-            successCount: 1,
-        })
+
+        const spansByTraceId = testsTraceExporter.getSpansByTraceId(parentSpanContext.traceId)
+        expect(spansByTraceId).toMatchObject([
+            {
+                name: 'SimpleWorkflow.myTask',
+                parentSpanId: parentSpanContext.spanId,
+                status: { code: SpanStatusCode.OK, message: 'Workflow Completed' },
+                attributes: {
+                    payload: testId,
+                },
+            },
+        ])
     })
 
     it.concurrent('runs the workflow if the step fails once', async () => {
-        const workflow = new SimpleWorkflow()
-        const store = new InMemoryStateStore()
         const testId = randomString()
-        const uniqueTaskId = await workflow.submit(
-            {
-                testId,
-                failuresRequested: 1,
-            },
-            store,
-        )
+        const store = new InMemoryStateStore()
 
-        const worker = new WorkflowWorker()
-        const result = await worker.executeWaitingWorkflow(
-            store,
-            { workflowType: workflow.workflowType },
-            FetchStrategy.Random,
-            1000,
-        )
+        const parentSpanContext = await trace
+            .getTracer('test')
+            .startActiveSpan(expect.getState().currentTestName!, { root: true }, async (span: Span) => {
+                const workflow = new SimpleWorkflow()
+                const uniqueTaskId = await workflow.submit(
+                    {
+                        testId,
+                        failuresRequested: 1,
+                    },
+                    store,
+                )
 
-        expect(result).toStrictEqual('Workflow Stopped')
-        expect(store.getStats()).toStrictEqual({
-            taskUpdatesSeen: 2, // Create, retry
-            tasksRemaining: 1,
-            unrecoverableTasks: 0,
-        })
-        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
-            failureCount: 1,
-            successCount: 0,
-        })
+                const worker = new WorkflowWorker()
+                const result = await worker.executeWaitingWorkflow(
+                    store,
+                    { workflowType: workflow.workflowType },
+                    FetchStrategy.Random,
+                    1000,
+                )
 
-        store.assumingTaskIsWaitingMakeItAvailable(uniqueTaskId)
+                expect(result).toStrictEqual('Workflow Stopped')
 
-        const result2 = await worker.executeWaitingWorkflow(
-            store,
-            { workflowType: workflow.workflowType },
-            FetchStrategy.Random,
-            1000,
-        )
+                store.assumingTaskIsWaitingMakeItAvailable(uniqueTaskId)
 
-        expect(result2).toStrictEqual('Workflow Completed')
+                const result2 = await worker.executeWaitingWorkflow(
+                    store,
+                    { workflowType: workflow.workflowType },
+                    FetchStrategy.Random,
+                    1000,
+                )
+
+                expect(result2).toStrictEqual('Workflow Completed')
+
+                return span.spanContext()
+            })
+
         expect(store.getStats()).toStrictEqual({
             taskUpdatesSeen: 3, // Create, retry, done
             tasksRemaining: 0,
             unrecoverableTasks: 0,
         })
-        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
-            failureCount: 1,
-            successCount: 1,
-        })
+
+        const spansByTraceId = testsTraceExporter.getSpansByTraceId(parentSpanContext.traceId)
+        expect(spansByTraceId).toMatchObject([
+            {
+                name: 'SimpleWorkflow.myTask',
+                parentSpanId: parentSpanContext.spanId,
+                status: { code: SpanStatusCode.ERROR },
+                attributes: {
+                    payload: testId,
+                },
+            },
+            {
+                name: 'SimpleWorkflow.myTask',
+                parentSpanId: parentSpanContext.spanId,
+                status: { code: SpanStatusCode.OK, message: 'Workflow Completed' },
+                attributes: {
+                    payload: testId,
+                },
+            },
+        ])
     })
 
     it.concurrent('turns the workflow unrecoverable if the step fails twice', async () => {
-        const workflow = new SimpleWorkflow()
-        const store = new InMemoryStateStore()
         const testId = randomString()
-        const uniqueTaskId = await workflow.submit(
-            {
-                testId,
-                failuresRequested: 2,
-            },
-            store,
-        )
+        const store = new InMemoryStateStore()
 
-        const worker = new WorkflowWorker()
-        const attempt1 = await worker.executeWaitingWorkflow(
-            store,
-            { workflowType: workflow.workflowType },
-            FetchStrategy.Random,
-            1000,
-        )
+        const parentSpanContext = await trace
+            .getTracer('test')
+            .startActiveSpan(expect.getState().currentTestName!, { root: true }, async (span: Span) => {
+                const workflow = new SimpleWorkflow()
+                const uniqueTaskId = await workflow.submit(
+                    {
+                        testId,
+                        failuresRequested: 2,
+                    },
+                    store,
+                )
 
-        expect(attempt1).toStrictEqual('Workflow Stopped')
-        expect(store.getStats()).toStrictEqual({
-            taskUpdatesSeen: 2, // Create, retry
-            tasksRemaining: 1,
-            unrecoverableTasks: 0,
-        })
-        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
-            failureCount: 1,
-            successCount: 0,
-        })
+                const worker = new WorkflowWorker()
+                const attempt1 = await worker.executeWaitingWorkflow(
+                    store,
+                    { workflowType: workflow.workflowType },
+                    FetchStrategy.Random,
+                    1000,
+                )
 
-        store.assumingTaskIsWaitingMakeItAvailable(uniqueTaskId)
+                expect(attempt1).toStrictEqual('Workflow Stopped')
 
-        const attempt2 = await worker.executeWaitingWorkflow(
-            store,
-            { workflowType: workflow.workflowType },
-            FetchStrategy.Random,
-            1000,
-        )
+                store.assumingTaskIsWaitingMakeItAvailable(uniqueTaskId)
 
-        expect(attempt2).toStrictEqual('Workflow Unrecoverable')
+                const attempt2 = await worker.executeWaitingWorkflow(
+                    store,
+                    { workflowType: workflow.workflowType },
+                    FetchStrategy.Random,
+                    1000,
+                )
+
+                expect(attempt2).toStrictEqual('Workflow Unrecoverable')
+
+                return span.spanContext()
+            })
+
         expect(store.getStats()).toStrictEqual({
             taskUpdatesSeen: 3, // Create, retry, permanent failure
             tasksRemaining: 0,
             unrecoverableTasks: 1,
         })
-        expect(workflow.getExecutionRegistry()[testId]).toStrictEqual({
-            failureCount: 2,
-            successCount: 0,
-        })
+
+        const spansByTraceId = testsTraceExporter.getSpansByTraceId(parentSpanContext.traceId)
+        expect(spansByTraceId).toMatchObject([
+            {
+                name: 'SimpleWorkflow.myTask',
+                parentSpanId: parentSpanContext.spanId,
+                status: { code: SpanStatusCode.ERROR },
+                attributes: {
+                    payload: testId,
+                },
+            },
+            {
+                name: 'SimpleWorkflow.myTask',
+                parentSpanId: parentSpanContext.spanId,
+                status: { code: SpanStatusCode.ERROR, message: 'Workflow Unrecoverable' },
+                attributes: {
+                    payload: testId,
+                },
+            },
+        ])
     })
 })
