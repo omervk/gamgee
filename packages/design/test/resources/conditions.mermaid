@@ -1,0 +1,14 @@
+---
+title: ConditionsWorkflow
+---
+
+stateDiagram-v2
+    state choice <<choice>>
+
+    direction LR
+    [*] --> decide
+    decide --> choice
+    choice --> left: chooseLeft
+    choice --> right: chooseRight
+    left --> [*]
+    right --> [*]
