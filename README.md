@@ -45,6 +45,14 @@ npm run generate
 
 Fill in the type-checked blanks.
 
+# Features
+
+1. Durable execution of workflows.
+2. Workflow is resumable.
+3. Multiple steps.
+4. Decision steps (_do I execute X or Y next?_)
+5. OpenTelemetry support (each step is a span)
+
 # Examples
 
 See [the examples directory](./packages/run/docs/examples) for a list of examples ordered by increasing complexity.
