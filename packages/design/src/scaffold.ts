@@ -136,7 +136,9 @@ function inferStepsAndDecisions(diagramStatements: Statement[]): {
                 }
 
                 if (to === '[*]') {
-                    steps[from].whatsNext = EndState
+                    if (!fromDecision) {
+                        steps[from].whatsNext = EndState
+                    }
                 } else {
                     if (!toDecision) {
                         steps[to] = steps[to] ?? {
@@ -304,16 +306,22 @@ function escapeString(str: string) {
 }
 
 function variableFromDecision(decision: Decision) {
-    const outcomes = decision.outcomes.map(
-        o =>
-            `
+    const outcomes = decision.outcomes.map(o => {
+        if (o.target !== EndState.name) {
+            return `
         ${camelCase(o.name)}(payload: ${stepNameToPayloadName(o.target)}) {
             return {
                 targetTaskName: '${escapeString(o.target)}',
                 payload,
             }
-        },`,
-    )
+        },`
+        } else {
+            return `
+        ${camelCase(o.name)}() {
+            return CompleteWorkflow;
+        },`
+        }
+    })
 
     return `protected ${camelCase(decision.name)} = {${outcomes.join('')}
     }`

@@ -19,9 +19,9 @@ type StepResult = {
     payload: JSONValue
 }
 
-type StepDefinition<T, R extends StepResult> = {
+type StepDefinition<T> = {
     name: string
-    run: (payload: T) => Promise<R>
+    run: (payload: T) => Promise<StepResult>
     attempts: number
     backoffMs: number
 }
@@ -36,14 +36,14 @@ function getCurrentOTelContext(): { traceparent: string; tracestate: string } {
 
 export abstract class WorkflowBase {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private readonly steps: { [name: string]: Omit<StepDefinition<any, StepResult>, 'name'> } = {}
+    private readonly steps: { [name: string]: Omit<StepDefinition<any>, 'name'> } = {}
 
     protected constructor(readonly workflowType: string) {
         // TODO: When trying to register two distinct implementations with the same name, throw (e.g. use a hash in the generated file)
         workflowFactory.register(workflowType, () => new (this.constructor as new () => this)())
     }
 
-    protected _registerStep<T extends JSONValue, R extends StepResult>(def: StepDefinition<T, R>): void {
+    protected _registerStep<T>(def: StepDefinition<T>): void {
         this.steps[def.name] = Object.assign({}, def, { run: def.run.bind(this) })
     }
 

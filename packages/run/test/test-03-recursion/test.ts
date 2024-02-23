@@ -1,18 +1,18 @@
 import InMemoryStateStore from '@gamgee/test/stateStores/in-memory'
 import { WorkflowWorker } from '../../src/worker'
-import { ConditionsWorkflow } from './conditions'
 import { FetchStrategy } from '@gamgee/interfaces/store'
 import { TestsTraceExporter } from '../tests-trace-exporter'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { Span, SpanStatusCode, trace } from '@opentelemetry/api'
 import { expect } from '@jest/globals'
+import { RecursionWorkflow } from './recursion'
 
 function randomString(): string {
     return Math.random().toString(36).slice(2)
 }
 
-describe('test conditions workflow', () => {
+describe('test recursion workflow', () => {
     const testsTraceExporter = new TestsTraceExporter()
     const sdk: NodeSDK = new NodeSDK({
         spanProcessor: new SimpleSpanProcessor(testsTraceExporter),
@@ -30,16 +30,12 @@ describe('test conditions workflow', () => {
         const parentSpanContext = await trace
             .getTracer('test')
             .startActiveSpan(expect.getState().currentTestName!, { root: true }, async (span: Span) => {
-                const workflow = new ConditionsWorkflow()
+                const workflow = new RecursionWorkflow()
                 await workflow.submit(
                     {
                         testId,
-                        choose: 'left',
-                        failuresRequested: {
-                            decideFailures: 0,
-                            leftFailures: 0,
-                            rightFailures: 0,
-                        },
+                        count: 4,
+                        failuresRequested: 0,
                     },
                     store,
                 )
@@ -58,7 +54,7 @@ describe('test conditions workflow', () => {
             })
 
         expect(store.getStats()).toStrictEqual({
-            taskUpdatesSeen: 3, // Create, ran choose, ran left and done
+            taskUpdatesSeen: 6, // Create, ran countDown(4), ran countDown(3), ran countDown(2), ran countDown(1), and done
             tasksRemaining: 0,
             unrecoverableTasks: 0,
         })
@@ -66,21 +62,52 @@ describe('test conditions workflow', () => {
         const spansByTraceId = testsTraceExporter.getSpansByTraceId(parentSpanContext.traceId)
         expect(spansByTraceId).toMatchObject([
             {
-                name: 'ConditionsWorkflow.decide',
+                name: 'RecursionWorkflow.countDown',
                 parentSpanId: parentSpanContext.spanId,
-                status: { code: SpanStatusCode.OK, message: 'Continuing to left' },
+                status: { code: SpanStatusCode.OK, message: 'Continuing to countDown' },
                 attributes: {
                     testId,
-                    choose: 'left',
+                    count: 4,
                     failuresRequested: 0,
                 },
             },
             {
-                name: 'ConditionsWorkflow.left',
+                name: 'RecursionWorkflow.countDown',
                 parentSpanId: spansByTraceId[0].spanId,
+                status: { code: SpanStatusCode.OK, message: 'Continuing to countDown' },
+                attributes: {
+                    testId,
+                    count: 3,
+                    failuresRequested: 0,
+                },
+            },
+            {
+                name: 'RecursionWorkflow.countDown',
+                parentSpanId: spansByTraceId[1].spanId,
+                status: { code: SpanStatusCode.OK, message: 'Continuing to countDown' },
+                attributes: {
+                    testId,
+                    count: 2,
+                    failuresRequested: 0,
+                },
+            },
+            {
+                name: 'RecursionWorkflow.countDown',
+                parentSpanId: spansByTraceId[2].spanId,
+                status: { code: SpanStatusCode.OK, message: 'Continuing to countDown' },
+                attributes: {
+                    testId,
+                    count: 1,
+                    failuresRequested: 0,
+                },
+            },
+            {
+                name: 'RecursionWorkflow.countDown',
+                parentSpanId: spansByTraceId[3].spanId,
                 status: { code: SpanStatusCode.OK, message: 'Workflow Completed' },
                 attributes: {
                     testId,
+                    count: 0,
                     failuresRequested: 0,
                 },
             },
