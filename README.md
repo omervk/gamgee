@@ -6,6 +6,8 @@
 
 An embedded framework to lend you a helping durable execution hand on your journey.
 
+![Build Status](https://github.com/omervk/gamgee/actions/workflows/build.yml/badge.svg)
+
 ## Philosophy
 
 <img src="./resources/tradeoffs.jpg" width="256" height="auto" />
