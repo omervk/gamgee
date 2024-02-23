@@ -4,7 +4,7 @@
   "description": "An embedded durable execution engine for TypeScript",
   "main": "index.ts",
   "scripts": {
-    "compile": "npm run compile --workspaces",
+    "build": "npm run build --workspaces",
     "test": "npm run test --workspaces --if-present",
     "generate": "npm run generate --workspaces --if-present",
     "lint": "npm run lint --workspaces"

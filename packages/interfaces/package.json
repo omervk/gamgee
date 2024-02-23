@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "description": "Interfaces between the different modules of Gamgee",
   "scripts": {
-    "compile": "cp ../../tsconfig.json . && tsc --build .",
+    "build": "cp ../../tsconfig.json . && tsc --build .",
     "lint": "eslint **/*.ts --fix"
   },
   "author": "Omer van Kloeten",
