@@ -419,7 +419,7 @@ export function mermaidToScaffold(
         firstStep,
         stepNameToPayloadName(firstStep),
         steps.map(s => stepNameToPayloadName(s.name)),
-        pascalCase(titleName),
+        pascalCase(titleName).replace(/(Workflow)?$/i, 'Workflow'),
     )
 
     return {
