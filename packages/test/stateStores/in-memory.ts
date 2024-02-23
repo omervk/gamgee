@@ -6,8 +6,21 @@ export default class InMemoryStateStore implements StateStore {
     private readonly tasks: { [id: string]: WorkflowTask & { clock: number } } = {}
     private readonly unrecoverableTasks: { [id: string]: WorkflowTask } = {}
 
-    async upsertTask(newTask: WorkflowTask): Promise<void> {
+    async insertTask(newTask: WorkflowTask): Promise<void> {
         this.tasks[newTask.instanceId] = Object.assign({ clock: this.clock }, newTask)
+        this.clock++
+        return Promise.resolve()
+    }
+
+    async updateTaskBy(fromTaskName: string, task: WorkflowTask): Promise<void> {
+        const oldTask = this.tasks[task.instanceId]
+        if (!oldTask || oldTask.taskName !== fromTaskName) {
+            return Promise.reject(
+                `Unable to find task by search criteria instanceId=${task.instanceId}, taskName=${fromTaskName}`,
+            )
+        }
+
+        this.tasks[task.instanceId] = Object.assign({ clock: this.clock }, task)
         this.clock++
         return Promise.resolve()
     }
@@ -99,7 +112,7 @@ export default class InMemoryStateStore implements StateStore {
         for (const task of tasksToRecover) {
             // Reset the attempts counter, since this is a recovered task
             const recoveredTask: WorkflowTask = Object.assign({}, task, { attempts: 0 })
-            await this.upsertTask(recoveredTask)
+            await this.updateTaskBy(recoveredTask.taskName, recoveredTask)
             delete this.unrecoverableTasks[task.instanceId]
             recoveredTasks.push(recoveredTask)
         }

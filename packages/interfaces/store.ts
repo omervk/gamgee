@@ -10,9 +10,15 @@ export type Query = Partial<{ workflowType: string; taskName: string }>
 
 export interface StateStore {
     /**
-     * Creates or replaces the task by its id.
+     * Creates a new task.
      */
-    upsertTask(newTask: WorkflowTask): Promise<void>
+    insertTask(newTask: WorkflowTask): Promise<void>
+
+    /**
+     * Updates a task by its instance id and task name.
+     * Rejects if the task with the specific search criteria was not found.
+     */
+    updateTaskBy(fromTaskName: string, task: WorkflowTask): Promise<void>
 
     /**
      * Try fetching any task fitting the query, then by the fetch strategy

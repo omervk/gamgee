@@ -67,14 +67,18 @@ export abstract class WorkflowBase {
                         return 'Workflow Completed'
                     }
 
-                    const nextTask = await this._enqueueImpl(store, {
-                        instanceId: task.instanceId,
-                        typeId: this.workflowType,
-                        taskName: result.targetTaskName, // TODO: Clearly separate between Task and Step
-                        payload: result.payload,
-                        attempts: 0,
-                        otelContext: getCurrentOTelContext(),
-                    })
+                    const nextTask = await this._enqueueImpl(
+                        store,
+                        {
+                            instanceId: task.instanceId,
+                            typeId: this.workflowType,
+                            taskName: result.targetTaskName, // TODO: Clearly separate between Task and Step
+                            payload: result.payload,
+                            attempts: 0,
+                            otelContext: getCurrentOTelContext(),
+                        },
+                        task.taskName,
+                    )
 
                     span.setStatus({ code: SpanStatusCode.OK, message: `Continuing to ${result.targetTaskName}` })
                     return nextTask
@@ -102,6 +106,7 @@ export abstract class WorkflowBase {
                             attempts: attemptsThatHappened,
                             onlyRunAfterTsMs: Date.now() + exponentialBackoffWithFullJitterMs,
                         }),
+                        task.taskName,
                     )
 
                     span.setStatus({ code: SpanStatusCode.ERROR })
@@ -114,6 +119,9 @@ export abstract class WorkflowBase {
         )
     }
 
+    /**
+     * Called exclusively from generated scaffolds.
+     */
     protected async _enqueue(
         taskName: string,
         payload: JSONValue,
@@ -129,11 +137,12 @@ export abstract class WorkflowBase {
             otelContext: getCurrentOTelContext(),
         }
 
-        return await this._enqueueImpl(store, newTask)
+        await store.insertTask(newTask)
+        return newTask
     }
 
-    private async _enqueueImpl(store: StateStore, newTask: WorkflowTask): Promise<WorkflowTask> {
-        await store.upsertTask(newTask)
+    private async _enqueueImpl(store: StateStore, newTask: WorkflowTask, fromTaskName: string): Promise<WorkflowTask> {
+        await store.updateTaskBy(fromTaskName, newTask)
         return newTask
     }
 }
