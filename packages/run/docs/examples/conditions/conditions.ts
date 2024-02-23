@@ -1,5 +1,5 @@
 import { CompleteWorkflow } from '@gamgee/run'
-import { ChoiceDecision, ConditionsWorkflowBase } from './conditions.generated'
+import { ConditionsWorkflowBase } from './conditions.generated'
 
 export type DecidePayload = Record<string, never>
 export type LeftPayload = Record<string, never>
@@ -10,19 +10,11 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
         super()
     }
 
-    decide(payload: DecidePayload): Promise<ChoiceDecision> {
+    decide(payload: DecidePayload) {
         if (Math.random() < 0.5) {
-            return Promise.resolve({
-                decision: 'chooseLeft',
-                targetTaskName: 'left',
-                payload: {},
-            })
+            return Promise.resolve(this.choice.chooseLeft({}))
         } else {
-            return Promise.resolve({
-                decision: 'chooseRight',
-                targetTaskName: 'right',
-                payload: {},
-            })
+            return Promise.resolve(this.choice.chooseRight({}))
         }
     }
 

@@ -5,26 +5,24 @@ import {WorkflowTask} from "@gamgee/interfaces/task";
 
 import {MyTaskPayload} from "./simple-workflow";
 
-
-
 export abstract class SimpleWorkflowBase extends WorkflowBase {
     protected constructor() {
         super('SimpleWorkflow');
-        
+
         super._registerStep({ name: 'myTask', run: this.myTask, attempts: 1, backoffMs: 1000 });
     }
-    
+
     async submit(payload: MyTaskPayload, store: StateStore, uniqueInstanceId?: string): Promise<string> {
         const task = await super._enqueue('myTask', payload, store, uniqueInstanceId);
         return task.instanceId;
     }
 
-    abstract myTask(payload: MyTaskPayload): Promise<CompleteWorkflow>;    
+    abstract myTask(payload: MyTaskPayload): Promise<CompleteWorkflow>;
 
     protected _registerStep() {
         throw new WrongTimingError();
     }
-    
+
     protected _enqueue(): Promise<WorkflowTask> {
         throw new WrongTimingError();
     }

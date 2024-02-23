@@ -1,5 +1,5 @@
 import { CompleteWorkflow } from '@gamgee/run'
-import { ChoiceDecision, ConditionsWorkflowBase } from './conditions.generated'
+import { ConditionsWorkflowBase } from './conditions.generated'
 import { trace } from '@opentelemetry/api'
 
 export type DecidePayload = {
@@ -28,7 +28,7 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
         super()
     }
 
-    async decide(payload: DecidePayload): Promise<ChoiceDecision> {
+    decide(payload: DecidePayload) {
         trace.getActiveSpan()?.setAttributes({
             testId: payload.testId,
             choose: payload.choose,
@@ -45,16 +45,18 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
         }
 
         return payload.choose === 'left'
-            ? Promise.resolve({
-                  decision: 'chooseLeft',
-                  targetTaskName: 'left',
-                  payload: { testId: payload.testId, failuresRequested: payload.failuresRequested.leftFailures },
-              })
-            : Promise.resolve({
-                  decision: 'chooseRight',
-                  targetTaskName: 'right',
-                  payload: { testId: payload.testId, failuresRequested: payload.failuresRequested.rightFailures },
-              })
+            ? Promise.resolve(
+                  this.choice.chooseLeft({
+                      testId: payload.testId,
+                      failuresRequested: payload.failuresRequested.leftFailures,
+                  }),
+              )
+            : Promise.resolve(
+                  this.choice.chooseRight({
+                      testId: payload.testId,
+                      failuresRequested: payload.failuresRequested.rightFailures,
+                  }),
+              )
     }
 
     left(payload: LeftPayload): Promise<CompleteWorkflow> {

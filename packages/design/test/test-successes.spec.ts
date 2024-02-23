@@ -14,7 +14,7 @@ describe('test generated scaffolds', () => {
             )
             expect(generatedFilePath).toStrictEqual(`${testName}.generated.ts`)
             expect(contents).toStrictEqual(
-                readFileSync(`./test/resources/${testName}.generated.ts`, { encoding: 'utf8' }),
+                readFileSync(`./test/resources/${testName}.generated.typescript`, { encoding: 'utf8' }),
             )
         })
     })

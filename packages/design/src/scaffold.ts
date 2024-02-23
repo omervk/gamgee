@@ -1,8 +1,8 @@
 import { parser, Statement, StateStatement } from './diagram/parser'
-import _ from 'lodash'
+import { camelCase } from 'lodash'
 import * as path from 'path'
 
-const pascalCase = (identifier: string) => _.camelCase(identifier).replace(/^(\w)/, s => s.toUpperCase())
+const pascalCase = (identifier: string) => camelCase(identifier).replace(/^(\w)/, s => s.toUpperCase())
 
 parser.yy = {
     setDirection: () => {
@@ -254,7 +254,7 @@ function inferStepsAndDecisions(diagramStatements: Statement[]): {
 
 function fillScaffoldTemplate(
     implementationRef: string,
-    decisionTypes: string[],
+    decisionVariables: string[],
     registerStepCalls: string[],
     functionDeclarationsCode: string[],
     firstTaskName: string,
@@ -269,8 +269,6 @@ import {WorkflowTask} from "@gamgee/interfaces/task";
 
 import {${payloadNames.join(', ')}} from "${implementationRef}";
 
-${decisionTypes.join('\n\n')}
-
 export abstract class ${workflowName}Base extends WorkflowBase {
     protected constructor() {
         super('${workflowName}');
@@ -283,7 +281,9 @@ export abstract class ${workflowName}Base extends WorkflowBase {
         return task.instanceId;
     }
 
-    ${functionDeclarationsCode.join('\n\n    ')}    
+    ${functionDeclarationsCode.join('\n\n    ')}
+    
+    ${decisionVariables.join('\n')}
 
     protected _registerStep() {
         throw new WrongTimingError();
@@ -299,24 +299,24 @@ function stepNameToPayloadName(stepName: string) {
     return `${pascalCase(stepName)}Payload`
 }
 
-function decisionNameToTypeName(decisionName: string) {
-    return `${pascalCase(decisionName)}Decision`
-}
-
 function escapeString(str: string) {
     return str.replace("'", "\\'")
 }
 
-function typeCodeFromDecision(decision: Decision) {
+function variableFromDecision(decision: Decision) {
     const outcomes = decision.outcomes.map(
-        o => `{
-    decision: '${escapeString(o.name)}',
-    targetTaskName: '${escapeString(o.target)}',
-    payload: ${stepNameToPayloadName(o.target)},
-}`,
+        o =>
+            `
+        ${camelCase(o.name)}(payload: ${stepNameToPayloadName(o.target)}) {
+            return {
+                targetTaskName: '${escapeString(o.target)}',
+                payload,
+            }
+        },`,
     )
 
-    return `export type ${decisionNameToTypeName(decision.name)} = ${outcomes.join(' | ')};`
+    return `protected ${camelCase(decision.name)} = {${outcomes.join('')}
+    }`
 }
 
 function registerStepCallCodeFromStep(step: Step) {
@@ -324,10 +324,10 @@ function registerStepCallCodeFromStep(step: Step) {
 }
 
 function stepToFunctionName(step: Step) {
-    return _.camelCase(step.name)
+    return camelCase(step.name)
 }
 
-function functionDeclarationCodeFromStep(step: Step) {
+function functionDeclarationCodeFromStep(step: Step, allDecisions: Decision[]) {
     let returnType: string
 
     switch (step.whatsNext) {
@@ -335,17 +335,26 @@ function functionDeclarationCodeFromStep(step: Step) {
             throw new Error(`Step ${step.name} has no outgoing connections.`)
 
         case EndState:
-            returnType = 'CompleteWorkflow'
+            returnType = 'Promise<CompleteWorkflow>'
             break
 
         default:
             switch (step.whatsNext.type) {
                 case 'step':
-                    returnType = `{ targetTaskName: '${_.camelCase(step.whatsNext.name)}', payload: ${stepNameToPayloadName(step.whatsNext.name)} }`
+                    returnType = `Promise<{ targetTaskName: '${camelCase(step.whatsNext.name)}', payload: ${stepNameToPayloadName(step.whatsNext.name)} }>`
                     break
 
                 case 'decision':
-                    returnType = decisionNameToTypeName(step.whatsNext.name)
+                    {
+                        const decisionName = step.whatsNext.name
+                        const decision = allDecisions.find(({ name }) => name === decisionName)!
+                        returnType = decision.outcomes
+                            .map(
+                                ({ name }) =>
+                                    `Promise<ReturnType<(typeof this.${camelCase(decision.name)})['${camelCase(name)}']>>`,
+                            )
+                            .join(' | ')
+                    }
                     break
 
                 default:
@@ -353,7 +362,19 @@ function functionDeclarationCodeFromStep(step: Step) {
             }
     }
 
-    return `abstract ${stepToFunctionName(step)}(payload: ${stepNameToPayloadName(step.name)}): Promise<${returnType}>;`
+    return `abstract ${stepToFunctionName(step)}(payload: ${stepNameToPayloadName(step.name)}): ${returnType};`
+}
+
+function compressNewlines(content: string) {
+    let prev = content
+    let next = content.replaceAll('\n\n\n', '\n\n')
+
+    while (next.length < prev.length) {
+        prev = next
+        next = next.replaceAll('\n\n\n', '\n\n')
+    }
+
+    return next
 }
 
 // TODO: implementationRelativePath is currently useless
@@ -374,25 +395,30 @@ export function mermaidToScaffold(
         throw new Error('Diagram has no steps that end in the end state [*].')
     }
 
-    const decisionTypesCode: string[] = decisions.map(d => typeCodeFromDecision(d))
+    const decisionVariables: string[] = decisions.map(d => variableFromDecision(d))
     const registerStepCalls: string[] = steps.map(s => registerStepCallCodeFromStep(s))
-    const functionDeclarationsCode: string[] = steps.map(s => functionDeclarationCodeFromStep(s))
+    const functionDeclarationsCode: string[] = steps.map(s => functionDeclarationCodeFromStep(s, decisions))
 
     const baseName = path.basename(diagramFilePath, path.extname(diagramFilePath))
     const generatedFilePath = path.join(path.dirname(diagramFilePath), baseName + '.generated.ts')
     const implementationRef = `${implementationRelativePath}/${baseName}`.replace('//', '/')
 
+    const contents = fillScaffoldTemplate(
+        implementationRef,
+        decisionVariables,
+        registerStepCalls,
+        functionDeclarationsCode,
+        firstStep,
+        stepNameToPayloadName(firstStep),
+        steps.map(s => stepNameToPayloadName(s.name)),
+        pascalCase(titleName),
+    )
+
     return {
         generatedFilePath,
-        contents: fillScaffoldTemplate(
-            implementationRef,
-            decisionTypesCode,
-            registerStepCalls,
-            functionDeclarationsCode,
-            firstStep,
-            stepNameToPayloadName(firstStep),
-            steps.map(s => stepNameToPayloadName(s.name)),
-            pascalCase(titleName),
+        contents: compressNewlines(
+            // Drop trailing spaces
+            contents.replaceAll(/ +\n^/gm, '\n'),
         ),
     }
 }

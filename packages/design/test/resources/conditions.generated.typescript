@@ -5,40 +5,45 @@ import {WorkflowTask} from "@gamgee/interfaces/task";
 
 import {DecidePayload, LeftPayload, RightPayload} from "./conditions";
 
-export type ChoiceDecision = {
-    decision: 'chooseLeft',
-    targetTaskName: 'left',
-    payload: LeftPayload,
-} | {
-    decision: 'chooseRight',
-    targetTaskName: 'right',
-    payload: RightPayload,
-};
-
 export abstract class ConditionsWorkflowBase extends WorkflowBase {
     protected constructor() {
         super('ConditionsWorkflow');
-        
+
         super._registerStep({ name: 'decide', run: this.decide, attempts: 1, backoffMs: 1000 });
         super._registerStep({ name: 'left', run: this.left, attempts: 1, backoffMs: 1000 });
         super._registerStep({ name: 'right', run: this.right, attempts: 1, backoffMs: 1000 });
     }
-    
+
     async submit(payload: DecidePayload, store: StateStore, uniqueInstanceId?: string): Promise<string> {
         const task = await super._enqueue('decide', payload, store, uniqueInstanceId);
         return task.instanceId;
     }
 
-    abstract decide(payload: DecidePayload): Promise<ChoiceDecision>;
+    abstract decide(payload: DecidePayload): Promise<ReturnType<(typeof this.choice)['chooseLeft']>> | Promise<ReturnType<(typeof this.choice)['chooseRight']>>;
 
     abstract left(payload: LeftPayload): Promise<CompleteWorkflow>;
 
-    abstract right(payload: RightPayload): Promise<CompleteWorkflow>;    
+    abstract right(payload: RightPayload): Promise<CompleteWorkflow>;
+
+    protected choice = {
+        chooseLeft(payload: LeftPayload) {
+            return {
+                targetTaskName: 'left',
+                payload,
+            }
+        },
+        chooseRight(payload: RightPayload) {
+            return {
+                targetTaskName: 'right',
+                payload,
+            }
+        },
+    }
 
     protected _registerStep() {
         throw new WrongTimingError();
     }
-    
+
     protected _enqueue(): Promise<WorkflowTask> {
         throw new WrongTimingError();
     }
