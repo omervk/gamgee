@@ -538,4 +538,31 @@ stateDiagram-v2
             ),
         )
     })
+
+    it.concurrent(`no cycles in DAG`, () => {
+        expect(() =>
+            mermaidToScaffold(
+                `
+---
+title: RecursionWorkflow
+---
+
+stateDiagram-v2
+    state decision <<choice>>
+
+    direction LR
+    [*] --> countDown
+    countDown --> decision
+    decision --> [*]: zero
+    decision --> countDown: nonZero
+                `.trim(),
+                `./test.ts`,
+                '.',
+            ),
+        ).toThrow(
+            new Error(
+                'The state diagram must be a directed acyclic graph (DAG), but found a cycle: countDown --> decision --> countDown.',
+            ),
+        )
+    })
 })

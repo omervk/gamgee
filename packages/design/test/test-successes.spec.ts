@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { expect } from '@jest/globals'
 
 describe('test generated scaffolds', () => {
-    const tests = ['simple-workflow', 'conditions', 'out-of-order', 'recursion']
+    const tests = ['simple-workflow', 'conditions', 'out-of-order']
 
     tests.forEach(testName => {
         it.concurrent(`test ${testName}.mermaid`, () => {

@@ -54,6 +54,7 @@ Fill in the type-checked blanks.
 3. Multiple steps.
 4. Decision steps (_do I execute X or Y next?_)
 5. OpenTelemetry support (each step is a span)
+6. DAG only (detect cycles)
 
 # Examples
 

@@ -2,4 +2,3 @@
 
 1. Simple workflow with one step: [simple-workflow](./simple-workflow).
 2. A workflow with a decision between going with the left or right branches: [conditions](./conditions).
-3. A workflow counting down recursively: [recursion](./recursion).

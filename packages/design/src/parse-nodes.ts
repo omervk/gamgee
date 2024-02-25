@@ -1,4 +1,5 @@
 import { RelationStatement, Statement, StateStatement } from './diagram/parser'
+import findDirectedCycle from 'find-cycle/directed'
 
 export type StateNode = {
     type: 'State'
@@ -205,6 +206,29 @@ function validateStates(states: { [name: string]: StateNode }) {
     return errors
 }
 
+function findFirstCycle(
+    states: { [name: string]: StateNode },
+    choices: { [name: string]: ChoiceNode },
+): string[] | null {
+    const stateConnections: [string, string[]][] = Object.keys(states).map(name => [
+        name,
+        states[name].goesTo.map(gt => gt.name),
+    ])
+    const choiceConnections: [string, string[]][] = Object.keys(choices).map(name => [
+        name,
+        Object.values(choices[name].goesTo).map(({ name }) => name),
+    ])
+    const sourceTargets: { [name: string]: string[] } = Object.fromEntries(
+        [...stateConnections, ...choiceConnections].map(([source, targets]) => [
+            source,
+            // Filter out the end state so that we don't accidentally find a cycle with [*] that is both the start and the end
+            targets.filter(t => t !== EndStateName),
+        ]),
+    )
+
+    return findDirectedCycle([StartStateName], name => sourceTargets[name] || []) || null
+}
+
 export function statementsToGraph(diagramStatements: Statement[]): {
     choices: { [name: string]: ChoiceNode }
     states: { [name: string]: StateNode }
@@ -237,6 +261,14 @@ export function statementsToGraph(diagramStatements: Statement[]): {
 
     if (validationErrors.length > 0) {
         throw new Error(`Found errors while validating the diagram:${validationErrors.map(e => `\n* ${e}`).join('')}`)
+    }
+
+    const cycle = findFirstCycle(states, choices)
+
+    if (cycle) {
+        throw new Error(
+            `The state diagram must be a directed acyclic graph (DAG), but found a cycle: ${cycle.join(' --> ')} --> ${cycle[0]}.`,
+        )
     }
 
     return { states, choices }

@@ -9,6 +9,7 @@
   "dependencies": {
     "@gamgee/interfaces": "0.0.0",
     "cmd-ts": "^0.13.0",
+    "find-cycle": "^1.1.0",
     "glob": "^10.3.10",
     "lodash": "^4.17.21"
   },
