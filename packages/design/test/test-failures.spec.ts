@@ -4,7 +4,7 @@ import { expect } from '@jest/globals'
 describe('test failures to generate scaffolds', () => {
     it.concurrent(`empty file`, () => {
         expect(() => mermaidToScaffold('', `./test.ts`, '.')).toThrow(
-            'Unable to parse Mermaid diagram - please check that you have both a header and a diagram.',
+            new Error('Unable to parse Mermaid diagram - please check that you have both a header and a diagram.'),
         )
     })
 
@@ -19,7 +19,9 @@ title: Workflow
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Unable to parse Mermaid diagram - please check that you have both a header and a diagram.')
+        ).toThrow(
+            new Error('Unable to parse Mermaid diagram - please check that you have both a header and a diagram.'),
+        )
     })
 
     it.concurrent(`no title`, () => {
@@ -33,7 +35,9 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Unable to parse Mermaid diagram - please check that you have both a header and a diagram.')
+        ).toThrow(
+            new Error('Unable to parse Mermaid diagram - please check that you have both a header and a diagram.'),
+        )
     })
 
     it.concurrent(`header but no title`, () => {
@@ -50,7 +54,7 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Mermaid diagram must have a title. Please specify one in the header.')
+        ).toThrow(new Error('Mermaid diagram must have a title. Please specify one in the header.'))
     })
 
     it.concurrent(`no start`, () => {
@@ -67,7 +71,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Unable to determine any step being the first, with a relation coming from [*].')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* Unable to determine any step being the first, with a relation coming from [*].',
+            ),
+        )
     })
 
     it.concurrent(`no end`, () => {
@@ -84,7 +93,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Diagram has no steps that end in the end state [*].')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* The state test has no outgoing connection and must be connected to the end state [*] explicitly.',
+            ),
+        )
     })
 
     it.concurrent(`start connects to end`, () => {
@@ -101,7 +115,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('The initial state [*] may not be directly connected to the end state [*].')
+        ).toThrow(
+            new Error(
+                "Found errors while parsing the diagram's relations:\n" +
+                    '* The start and end states may not have self-arrows or be linked directly to each other.',
+            ),
+        )
     })
 
     it.concurrent(`two states from start`, () => {
@@ -121,7 +140,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Unable to have multiple first steps. Only one step may arrive from [*]. Found both a and b.')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* Only one relation may leave a non-decision step. The step [*] has outgoing arrows to the steps a, b.',
+            ),
+        )
     })
 
     it.concurrent(`two states from one state`, () => {
@@ -143,7 +167,10 @@ stateDiagram-v2
                 '.',
             ),
         ).toThrow(
-            'Only one relation may leave a non-decision step. The step a is related to both of the steps b and c.',
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* Only one relation may leave a non-decision step. The step a has outgoing arrows to the steps b, c.',
+            ),
         )
     })
 
@@ -169,7 +196,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Decisions may not have self-arrows. The decision choice connects to itself.')
+        ).toThrow(
+            new Error(
+                "Found errors while parsing the diagram's relations:\n" +
+                    '* Decisions may not have self-arrows. The decision choice connects to itself.',
+            ),
+        )
     })
 
     it.concurrent(`decision to decision`, () => {
@@ -196,14 +228,17 @@ stateDiagram-v2
                 '.',
             ),
         ).toThrow(
-            'A decision can not be directly connected to another decision. There is a connection between choice1 and choice2.',
+            new Error(
+                "Found errors while parsing the diagram's relations:\n" +
+                    '* A decision can not be directly connected to another decision. There is a connection between choice1 and choice2.',
+            ),
         )
     })
 
-    it.concurrent(`unnamed decision`, () => {
-        expect(() =>
-            mermaidToScaffold(
-                `
+    it.concurrent(`unnamed decision`, () => {})
+    expect(() =>
+        mermaidToScaffold(
+            `
 ---
 title: Workflow
 ---
@@ -219,11 +254,15 @@ stateDiagram-v2
     left --> [*]
     right --> [*]
 `.trim(),
-                `./test.ts`,
-                '.',
-            ),
-        ).toThrow('All relations coming out of decisions must be named. The relation from choice to right is unnamed.')
-    })
+            `./test.ts`,
+            '.',
+        ),
+    ).toThrow(
+        new Error(
+            "Found errors while parsing the diagram's relations:\n" +
+                '* All relations coming out of decisions must be named. The relation from choice to right is unnamed.',
+        ),
+    )
 
     it.concurrent(`undescribed self-arrow`, () => {
         expect(() =>
@@ -241,7 +280,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Self-arrows must include information about retries. The self-arrow on a provides no information.')
+        ).toThrow(
+            new Error(
+                "Found errors while parsing the diagram's relations:\n" +
+                    '* Self-arrows must include information about retries. The self-arrow on a provides no information.',
+            ),
+        )
     })
 
     it.concurrent(`attempts are text`, () => {
@@ -260,7 +304,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Number of attempts for a is not a number. Only whole positive numbers are allowed.')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    "* Number of attempts for a is 'a', which is not a number. Only whole positive numbers are allowed.",
+            ),
+        )
     })
 
     it.concurrent(`attempts are negative`, () => {
@@ -279,7 +328,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Number of attempts for a is -2. Only whole positive numbers are allowed.')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* Number of attempts for a is -2. Only whole positive numbers are allowed.',
+            ),
+        )
     })
 
     it.concurrent(`attempts are 0`, () => {
@@ -298,7 +352,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Number of attempts for a is 0. Only whole positive numbers are allowed.')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* Number of attempts for a is 0. Only whole positive numbers are allowed.',
+            ),
+        )
     })
 
     it.concurrent(`attempts are not whole number`, () => {
@@ -317,7 +376,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('Number of attempts for a is 1.23. Only whole positive numbers are allowed.')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* Number of attempts for a is 1.23. Only whole positive numbers are allowed.',
+            ),
+        )
     })
 
     it.concurrent(`backoffMs is text`, () => {
@@ -336,7 +400,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('backoffMs for a is not a number. Only whole positive numbers are allowed.')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    "* backoffMs for a is 'a', which is not a number. Only whole positive numbers are allowed.",
+            ),
+        )
     })
 
     it.concurrent(`backoffMs is negative`, () => {
@@ -355,7 +424,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('backoffMs for a is -2. Only whole positive numbers are allowed.')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* backoffMs for a is -2. Only whole positive numbers are allowed.',
+            ),
+        )
     })
 
     it.concurrent(`backoffMs is 0`, () => {
@@ -374,7 +448,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('backoffMs for a is 0. Only whole positive numbers are allowed.')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* backoffMs for a is 0. Only whole positive numbers are allowed.',
+            ),
+        )
     })
 
     it.concurrent(`backoffMs is not whole number`, () => {
@@ -393,7 +472,12 @@ stateDiagram-v2
                 `./test.ts`,
                 '.',
             ),
-        ).toThrow('backoffMs for a is 1.23. Only whole positive numbers are allowed.')
+        ).toThrow(
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* backoffMs for a is 1.23. Only whole positive numbers are allowed.',
+            ),
+        )
     })
 
     it.concurrent(`floating end states`, () => {
@@ -416,7 +500,42 @@ stateDiagram-v2
                 '.',
             ),
         ).toThrow(
-            'The following steps have no outgoing connections and must be connected to the end state [*] explicitly: left, right.',
+            new Error(
+                'Found errors while validating the diagram:\n' +
+                    '* The state left has no outgoing connection and must be connected to the end state [*] explicitly.\n' +
+                    '* The state right has no outgoing connection and must be connected to the end state [*] explicitly.',
+            ),
+        )
+    })
+
+    it.concurrent(`non-unique choices`, () => {
+        expect(() =>
+            mermaidToScaffold(
+                `
+---
+title: Workflow
+---
+
+stateDiagram-v2
+    state choice1 <<choice>>
+    state choice2 <<choice>>
+
+    [*] --> decide
+    decide --> choice1
+    choice1 --> left: makeTheChoice
+    choice1 --> right: makeTheChoice
+    left --> choice2
+    choice2 --> right: makeTheChoice
+    right --> [*]
+                `.trim(),
+                `./test.ts`,
+                '.',
+            ),
+        ).toThrow(
+            new Error(
+                "Found errors while parsing the diagram's relations:\n" +
+                    '* More than one relation coming out of choice1 is named makeTheChoice. Relation names must be unique for each source.',
+            ),
         )
     })
 })

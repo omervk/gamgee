@@ -1,6 +1,7 @@
-import { parser, Statement, StateStatement } from './diagram/parser'
+import { parser } from './diagram/parser'
 import { camelCase } from 'lodash'
 import * as path from 'path'
+import { statementsToGraph, ChoiceNode, StateNode, EndStateName, StartStateName } from './parse-nodes'
 
 const pascalCase = (identifier: string) => camelCase(identifier).replace(/^(\w)/, s => s.toUpperCase())
 
@@ -28,29 +29,6 @@ parser.yy = {
     },
 }
 
-const NoOutgoingConnection = '???'
-
-const EndState = { type: 'end-state', name: '[*]' }
-
-type Step = {
-    name: string
-    attempts: number
-    backoffMs: number
-    whatsNext:
-        | { type: 'step'; name: string }
-        | {
-              type: 'decision'
-              name: string
-          }
-        | typeof NoOutgoingConnection
-        | typeof EndState
-}
-
-type Decision = {
-    name: string
-    outcomes: { name: string; target: string }[]
-}
-
 function splitFile(mermaidContents: string): { header: string; diagramBody: string } {
     const split = /---(.+)---(.+)/s.exec(mermaidContents)
 
@@ -72,186 +50,6 @@ function titleNameFromHeader(header: string): string {
     }
 
     return pascalCase(titleExec[1])
-}
-
-function inferStepsAndDecisions(diagramStatements: Statement[]): {
-    firstStep: string
-    decisions: Decision[]
-    steps: Step[]
-} {
-    const steps: { [name: string]: Step } = {}
-    const decisions: { [name: string]: Decision } = {}
-    let firstStep: string | null = null
-
-    const validDecisionNames = diagramStatements
-        .filter(s => s.stmt === 'state' && s.type === 'choice')
-        .map(s => (s as StateStatement).id)
-
-    for (const statement of diagramStatements) {
-        if (statement.stmt === 'state') {
-            if (statement.type === 'choice') {
-                // Already covered before
-                continue
-            }
-
-            console.log(`Ignoring unsupported statement: ${JSON.stringify(statement)}`)
-        } else if (statement.stmt === 'relation') {
-            const from = statement.state1.id
-            const to = statement.state2.id
-
-            const fromDecision = validDecisionNames.includes(from)
-            const toDecision = validDecisionNames.includes(to)
-
-            // TODO: Split to validation and walking
-            // TODO: Validate names are valid identifiers, too
-            if (from === '[*]') {
-                // First step
-                if (firstStep !== null) {
-                    throw new Error(
-                        `Unable to have multiple first steps. Only one step may arrive from [*]. Found both ${firstStep} and ${statement.state2.id}.`,
-                    )
-                }
-
-                if (to === '[*]') {
-                    throw new Error('The initial state [*] may not be directly connected to the end state [*].')
-                }
-
-                firstStep = to
-            } else {
-                if (!fromDecision) {
-                    steps[from] = steps[from] ?? {
-                        name: from,
-                        attempts: 1,
-                        backoffMs: 1000,
-                        whatsNext: NoOutgoingConnection,
-                    }
-
-                    const whatsNext = steps[from].whatsNext
-
-                    if (whatsNext !== NoOutgoingConnection && from !== to) {
-                        throw new Error(
-                            `Only one relation may leave a non-decision step. The step ${from} is related to both of the steps ${whatsNext.name} and ${to}.`,
-                        )
-                    }
-                }
-
-                if (to === '[*]') {
-                    if (!fromDecision) {
-                        steps[from].whatsNext = EndState
-                    }
-                } else {
-                    if (!toDecision) {
-                        steps[to] = steps[to] ?? {
-                            name: to,
-                            attempts: 1,
-                            backoffMs: 1000,
-                            whatsNext: NoOutgoingConnection,
-                        }
-                    }
-
-                    if (!fromDecision && from !== to) {
-                        steps[from].whatsNext = { name: to, type: toDecision ? 'decision' : 'step' }
-                    }
-                }
-            }
-
-            if (fromDecision) {
-                if (from === to) {
-                    throw new Error(
-                        `Decisions may not have self-arrows. The decision ${statement.state1.id} connects to itself.`,
-                    )
-                }
-
-                if (toDecision) {
-                    throw new Error(
-                        `A decision can not be directly connected to another decision. There is a connection between ${from} and ${to}.`,
-                    )
-                }
-
-                if (statement.description === undefined) {
-                    throw new Error(
-                        `All relations coming out of decisions must be named. The relation from ${from} to ${statement.state2.id} is unnamed.`,
-                    )
-                }
-
-                decisions[from] = decisions[from] ?? { name: from, outcomes: [] }
-                decisions[from].outcomes.push({ name: statement.description, target: to })
-            }
-
-            if (from === to) {
-                // This is a self-arrow
-                if (statement.description === undefined) {
-                    throw new Error(
-                        `Self-arrows must include information about retries. The self-arrow on ${from} provides no information.`,
-                    )
-                }
-
-                // Note: The parser escapes backslashes
-                const parsedPairs: [string, string][] = statement.description
-                    .replace('\\n', '\n')
-                    .split('\n')
-                    .map(s => s.split('='))
-                    .filter(arr => arr.length === 2)
-                    .map(([k, v]) => [k, v])
-
-                const parameters: { [name: string]: string } = Object.fromEntries<string>(parsedPairs)
-
-                if (parameters.attempts) {
-                    const attempts = Number.parseFloat(parameters.attempts)
-
-                    if (Number.isNaN(attempts)) {
-                        throw new Error(
-                            `Number of attempts for ${from} is not a number. Only whole positive numbers are allowed.`,
-                        )
-                    }
-
-                    if (attempts <= 0 || Math.floor(attempts) !== attempts) {
-                        throw new Error(
-                            `Number of attempts for ${from} is ${attempts}. Only whole positive numbers are allowed.`,
-                        )
-                    }
-
-                    steps[from].attempts = attempts
-                }
-
-                if (parameters.backoffMs) {
-                    const backoffMs = Number.parseFloat(parameters.backoffMs)
-
-                    if (Number.isNaN(backoffMs)) {
-                        throw new Error(
-                            `backoffMs for ${from} is not a number. Only whole positive numbers are allowed.`,
-                        )
-                    }
-
-                    if (backoffMs <= 0 || Math.floor(backoffMs) !== backoffMs) {
-                        throw new Error(
-                            `backoffMs for ${from} is ${backoffMs}. Only whole positive numbers are allowed.`,
-                        )
-                    }
-
-                    steps[from].backoffMs = backoffMs
-                }
-            }
-        } else {
-            console.log('Ignoring unsupported statement: ' + JSON.stringify(statement))
-        }
-    }
-
-    if (firstStep === null) {
-        throw new Error('Unable to determine any step being the first, with a relation coming from [*].')
-    }
-
-    const stepsWithoutOutgoingConnections = Object.values(steps)
-        .filter(s => s.whatsNext === NoOutgoingConnection)
-        .map(s => s.name)
-
-    if (stepsWithoutOutgoingConnections.length > 0) {
-        throw new Error(
-            `The following steps have no outgoing connections and must be connected to the end state [*] explicitly: ${stepsWithoutOutgoingConnections.join(', ')}.`,
-        )
-    }
-
-    return { firstStep, steps: Object.values(steps), decisions: Object.values(decisions) }
 }
 
 function fillScaffoldTemplate(
@@ -305,72 +103,55 @@ function escapeString(str: string) {
     return str.replace("'", "\\'")
 }
 
-function variableFromDecision(decision: Decision) {
-    const outcomes = decision.outcomes.map(o => {
-        if (o.target !== EndState.name) {
+function variableFromDecision(node: ChoiceNode) {
+    const outcomes = Object.entries(node.goesTo).map(([optionName, toNode]) => {
+        if (toNode.name !== EndStateName) {
             return `
-        ${camelCase(o.name)}(payload: ${stepNameToPayloadName(o.target)}) {
+        ${camelCase(optionName)}(payload: ${stepNameToPayloadName(toNode.name)}) {
             return {
-                targetTaskName: '${escapeString(o.target)}',
+                targetTaskName: '${escapeString(toNode.name)}',
                 payload,
             }
         },`
         } else {
             return `
-        ${camelCase(o.name)}() {
+        ${camelCase(optionName)}() {
             return CompleteWorkflow;
         },`
         }
     })
 
-    return `protected ${camelCase(decision.name)} = {${outcomes.join('')}
+    return `protected ${camelCase(node.name)} = {${outcomes.join('')}
     }`
 }
 
-function registerStepCallCodeFromStep(step: Step) {
-    return `super._registerStep({ name: '${escapeString(step.name)}', run: this.${stepToFunctionName(step)}, attempts: ${step.attempts}, backoffMs: ${step.backoffMs} });`
+function registerStepCallCodeFromStep(node: StateNode) {
+    return `super._registerStep({ name: '${escapeString(node.name)}', run: this.${stepNameToFunctionName(node.name)}, attempts: ${node.knownAttributes.attempts || 1}, backoffMs: ${node.knownAttributes.backoffMs || 1000} });`
 }
 
-function stepToFunctionName(step: Step) {
-    return camelCase(step.name)
+function stepNameToFunctionName(name: string) {
+    return camelCase(name)
 }
 
-function functionDeclarationCodeFromStep(step: Step, allDecisions: Decision[]) {
+function functionDeclarationCodeFromStep(node: StateNode) {
     let returnType: string
 
-    switch (step.whatsNext) {
-        case NoOutgoingConnection:
-            throw new Error(`Step ${step.name} has no outgoing connections.`)
+    const nextStep = node.goesTo[0]
 
-        case EndState:
-            returnType = 'Promise<CompleteWorkflow>'
-            break
-
-        default:
-            switch (step.whatsNext.type) {
-                case 'step':
-                    returnType = `Promise<{ targetTaskName: '${camelCase(step.whatsNext.name)}', payload: ${stepNameToPayloadName(step.whatsNext.name)} }>`
-                    break
-
-                case 'decision':
-                    {
-                        const decisionName = step.whatsNext.name
-                        const decision = allDecisions.find(({ name }) => name === decisionName)!
-                        returnType = decision.outcomes
-                            .map(
-                                ({ name }) =>
-                                    `Promise<ReturnType<(typeof this.${camelCase(decision.name)})['${camelCase(name)}']>>`,
-                            )
-                            .join(' | ')
-                    }
-                    break
-
-                default:
-                    throw new Error(`Internal error: Unknown next step type ${JSON.stringify(step.whatsNext)}`)
-            }
+    if (nextStep.name === EndStateName) {
+        returnType = 'Promise<CompleteWorkflow>'
+    } else if (nextStep.type === 'State') {
+        returnType = `Promise<{ targetTaskName: '${camelCase(nextStep.name)}', payload: ${stepNameToPayloadName(nextStep.name)} }>`
+    } else {
+        returnType = Object.keys(nextStep.goesTo)
+            .map(
+                optionName =>
+                    `Promise<ReturnType<(typeof this.${camelCase(nextStep.name)})['${camelCase(optionName)}']>>`,
+            )
+            .join(' | ')
     }
 
-    return `abstract ${stepToFunctionName(step)}(payload: ${stepNameToPayloadName(step.name)}): ${returnType};`
+    return `abstract ${stepNameToFunctionName(node.name)}(payload: ${stepNameToPayloadName(node.name)}): ${returnType};`
 }
 
 function compressNewlines(content: string) {
@@ -397,15 +178,16 @@ export function mermaidToScaffold(
 
     const output = parser.parse(diagramBody)
 
-    const { firstStep, steps, decisions } = inferStepsAndDecisions(output)
+    const { states, choices } = statementsToGraph(output)
+    const firstStep = states[StartStateName].goesTo[0]
+    const statesExcludingFirst = states
+    delete statesExcludingFirst[StartStateName]
 
-    if (steps.length === 0) {
-        throw new Error('Diagram has no steps that end in the end state [*].')
-    }
-
-    const decisionVariables: string[] = decisions.map(d => variableFromDecision(d))
-    const registerStepCalls: string[] = steps.map(s => registerStepCallCodeFromStep(s))
-    const functionDeclarationsCode: string[] = steps.map(s => functionDeclarationCodeFromStep(s, decisions))
+    const decisionVariables: string[] = Object.values(choices).map(d => variableFromDecision(d))
+    const registerStepCalls: string[] = Object.values(statesExcludingFirst).map(s => registerStepCallCodeFromStep(s))
+    const functionDeclarationsCode: string[] = Object.values(statesExcludingFirst).map(s =>
+        functionDeclarationCodeFromStep(s),
+    )
 
     const baseName = path.basename(diagramFilePath, path.extname(diagramFilePath))
     const generatedFilePath = path.join(path.dirname(diagramFilePath), baseName + '.generated.ts')
@@ -416,9 +198,9 @@ export function mermaidToScaffold(
         decisionVariables,
         registerStepCalls,
         functionDeclarationsCode,
-        firstStep,
-        stepNameToPayloadName(firstStep),
-        steps.map(s => stepNameToPayloadName(s.name)),
+        firstStep.name,
+        stepNameToPayloadName(firstStep.name),
+        Object.keys(statesExcludingFirst).map(name => stepNameToPayloadName(name)),
         pascalCase(titleName).replace(/(Workflow)?$/i, 'Workflow'),
     )
 
