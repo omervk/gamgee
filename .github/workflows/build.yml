@@ -27,8 +27,5 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
     - run: npm ci
-    - run: npm run generate --workspace=@gamgee/design
-    - run: npm run build --workspace=@gamgee/design
-    - run: npm run generate
     - run: npm run build
     - run: npm test

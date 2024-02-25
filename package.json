@@ -4,9 +4,8 @@
   "description": "An embedded durable execution engine for TypeScript",
   "main": "index.ts",
   "scripts": {
-    "build": "npm run build --workspaces",
+    "build": "npm run generate --workspace=@gamgee/design && npm run build --workspace=@gamgee/design && npm run generate --workspaces --if-present && npm run build --workspaces",
     "test": "npm run test --workspaces --if-present",
-    "generate": "npm run generate --workspaces --if-present",
     "lint": "npm run lint --workspaces"
   },
   "author": "Omer van Kloeten",
