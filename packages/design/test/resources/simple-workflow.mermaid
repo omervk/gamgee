@@ -4,5 +4,7 @@ title: SimpleWorkflow
 
 stateDiagram-v2
     direction LR
-    [*] --> myTask
-    myTask --> [*]
+    [*] --> task1
+    task1 --> task1: attempts=2
+    task1 --> task2
+    task2 --> [*]

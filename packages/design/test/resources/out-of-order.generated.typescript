@@ -9,7 +9,7 @@ export abstract class OooWorkflowBase extends WorkflowBase {
     protected constructor() {
         super('OooWorkflow');
 
-        super._registerStep({ name: 'myTask', run: this.myTask, attempts: 1, backoffMs: 1000 });
+        super._registerStep({ name: 'myTask', run: this.invokeMyTask, attempts: 1, backoffMs: 1000 });
     }
 
     async submit(payload: MyTaskPayload, store: StateStore, uniqueInstanceId?: string): Promise<string> {
@@ -17,7 +17,12 @@ export abstract class OooWorkflowBase extends WorkflowBase {
         return task.instanceId;
     }
 
-    abstract myTask(payload: MyTaskPayload): Promise<CompleteWorkflow>;
+    private async invokeMyTask(payload: MyTaskPayload): Promise<CompleteWorkflow> {
+        await this.myTask(payload);
+        return Promise.resolve(CompleteWorkflow);
+    }
+
+    abstract myTask(payload: MyTaskPayload): Promise<void>;
 
     protected _registerStep() {
         throw new WrongTimingError();

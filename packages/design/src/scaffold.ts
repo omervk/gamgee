@@ -126,22 +126,43 @@ function variableFromDecision(node: ChoiceNode) {
 }
 
 function registerStepCallCodeFromStep(node: StateNode) {
-    return `super._registerStep({ name: '${escapeString(node.name)}', run: this.${stepNameToFunctionName(node.name)}, attempts: ${node.knownAttributes.attempts || 1}, backoffMs: ${node.knownAttributes.backoffMs || 1000} });`
+    return `super._registerStep({ name: '${escapeString(node.name)}', run: this.${nodeToInvokeFunctionName(node)}, attempts: ${node.knownAttributes.attempts || 1}, backoffMs: ${node.knownAttributes.backoffMs || 1000} });`
 }
 
 function stepNameToFunctionName(name: string) {
     return camelCase(name)
 }
 
+function nodeToInvokeFunctionName(node: StateNode) {
+    if (node.goesTo[0].type === 'Choice') {
+        return stepNameToFunctionName(node.name)
+    }
+
+    return `invoke${pascalCase(stepNameToFunctionName(node.name))}`
+}
+
 function functionDeclarationCodeFromStep(node: StateNode) {
     let returnType: string
+    let invokeFunction: string | undefined
 
     const nextStep = node.goesTo[0]
 
     if (nextStep.name === EndStateName) {
-        returnType = 'Promise<CompleteWorkflow>'
+        returnType = 'Promise<void>'
+        invokeFunction = `
+    private async ${nodeToInvokeFunctionName(node)}(payload: ${stepNameToPayloadName(node.name)}): Promise<CompleteWorkflow> {
+        await this.${stepNameToFunctionName(node.name)}(payload);
+        return Promise.resolve(CompleteWorkflow);
+    }
+`
     } else if (nextStep.type === 'State') {
-        returnType = `Promise<{ targetTaskName: '${camelCase(nextStep.name)}', payload: ${stepNameToPayloadName(nextStep.name)} }>`
+        returnType = `Promise<${stepNameToPayloadName(nextStep.name)}>`
+        invokeFunction = `
+    private async ${nodeToInvokeFunctionName(node)}(payload: ${stepNameToPayloadName(node.name)}): Promise<{ targetTaskName: '${nextStep.name}'; payload: ${stepNameToPayloadName(nextStep.name)} }> {
+        const response: ${stepNameToPayloadName(nextStep.name)} = await this.${stepNameToFunctionName(node.name)}(payload);
+        return { targetTaskName: '${nextStep.name}', payload: response };
+    }
+`
     } else {
         returnType = Object.keys(nextStep.goesTo)
             .map(
@@ -151,7 +172,9 @@ function functionDeclarationCodeFromStep(node: StateNode) {
             .join(' | ')
     }
 
-    return `abstract ${stepNameToFunctionName(node.name)}(payload: ${stepNameToPayloadName(node.name)}): ${returnType};`
+    const abstractFunctionSignature = `abstract ${stepNameToFunctionName(node.name)}(payload: ${stepNameToPayloadName(node.name)}): ${returnType};`
+
+    return [invokeFunction, abstractFunctionSignature].filter(s => !!s).join('\n    ')
 }
 
 function compressNewlines(content: string) {

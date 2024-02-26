@@ -59,7 +59,7 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
               )
     }
 
-    left(payload: LeftPayload): Promise<CompleteWorkflow> {
+    left(payload: LeftPayload): Promise<void> {
         trace.getActiveSpan()?.setAttributes({
             testId: payload.testId,
             failuresRequested: payload.failuresRequested,
@@ -72,10 +72,10 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
             throw new Error('Task failed successfully :)')
         }
 
-        return Promise.resolve(CompleteWorkflow)
+        return Promise.resolve()
     }
 
-    right(payload: RightPayload): Promise<CompleteWorkflow> {
+    right(payload: RightPayload): Promise<void> {
         trace.getActiveSpan()?.setAttributes({
             testId: payload.testId,
             failuresRequested: payload.failuresRequested,
@@ -88,6 +88,6 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
             throw new Error('Task failed successfully :)')
         }
 
-        return Promise.resolve(CompleteWorkflow)
+        return Promise.resolve()
     }
 }

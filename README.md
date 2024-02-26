@@ -4,7 +4,7 @@
 
 # Gamgee
 
-An embedded framework to lend you a helping durable execution hand on your journey.
+An embedded framework to lend you a helping (durable execution) hand on your journey.
 
 ![Build Status](https://github.com/omervk/gamgee/actions/workflows/build.yml/badge.svg)
 
@@ -32,7 +32,6 @@ stateDiagram-v2
 
 Only implement this:
 ```typescript
-import { CompleteWorkflow } from '@gamgee/run'
 import { ConditionsWorkflowBase } from './conditions.generated'
 
 export type DecidePayload = Record<string, never>
@@ -52,14 +51,14 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
         }
     }
 
-    left(payload: LeftPayload): Promise<CompleteWorkflow> {
+    left(payload: LeftPayload): Promise<void> {
         console.log('We chose left')
-        return Promise.resolve(CompleteWorkflow)
+        return Promise.resolve()
     }
 
-    right(payload: RightPayload): Promise<CompleteWorkflow> {
+    right(payload: RightPayload): Promise<void> {
         console.log('We chose right')
-        return Promise.resolve(CompleteWorkflow)
+        return Promise.resolve()
     }
 }
 ```

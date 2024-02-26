@@ -3,21 +3,34 @@ import {CompleteWorkflow, WrongTimingError, WorkflowBase} from "@gamgee/run";
 import {StateStore} from "@gamgee/interfaces/store";
 import {WorkflowTask} from "@gamgee/interfaces/task";
 
-import {MyTaskPayload} from "./simple-workflow";
+import {Task1Payload, Task2Payload} from "./simple-workflow";
 
 export abstract class SimpleWorkflowBase extends WorkflowBase {
     protected constructor() {
         super('SimpleWorkflow');
 
-        super._registerStep({ name: 'myTask', run: this.myTask, attempts: 2, backoffMs: 1000 });
+        super._registerStep({ name: 'task1', run: this.invokeTask1, attempts: 2, backoffMs: 1000 });
+        super._registerStep({ name: 'task2', run: this.invokeTask2, attempts: 1, backoffMs: 1000 });
     }
 
-    async submit(payload: MyTaskPayload, store: StateStore, uniqueInstanceId?: string): Promise<string> {
-        const task = await super._enqueue('myTask', payload, store, uniqueInstanceId);
+    async submit(payload: Task1Payload, store: StateStore, uniqueInstanceId?: string): Promise<string> {
+        const task = await super._enqueue('task1', payload, store, uniqueInstanceId);
         return task.instanceId;
     }
 
-    abstract myTask(payload: MyTaskPayload): Promise<CompleteWorkflow>;
+    private async invokeTask1(payload: Task1Payload): Promise<{ targetTaskName: 'task2'; payload: Task2Payload }> {
+        const response: Task2Payload = await this.task1(payload);
+        return { targetTaskName: 'task2', payload: response };
+    }
+
+    abstract task1(payload: Task1Payload): Promise<Task2Payload>;
+
+    private async invokeTask2(payload: Task2Payload): Promise<CompleteWorkflow> {
+        await this.task2(payload);
+        return Promise.resolve(CompleteWorkflow);
+    }
+
+    abstract task2(payload: Task2Payload): Promise<void>;
 
     protected _registerStep() {
         throw new WrongTimingError();

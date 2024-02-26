@@ -1,4 +1,3 @@
-import { CompleteWorkflow } from '@gamgee/run'
 import { ConditionsWorkflowBase } from './conditions.generated'
 
 export type DecidePayload = Record<string, never>
@@ -18,13 +17,13 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
         }
     }
 
-    left(payload: LeftPayload): Promise<CompleteWorkflow> {
+    left(payload: LeftPayload): Promise<void> {
         console.log('We chose left')
-        return Promise.resolve(CompleteWorkflow)
+        return Promise.resolve()
     }
 
-    right(payload: RightPayload): Promise<CompleteWorkflow> {
+    right(payload: RightPayload): Promise<void> {
         console.log('We chose right')
-        return Promise.resolve(CompleteWorkflow)
+        return Promise.resolve()
     }
 }

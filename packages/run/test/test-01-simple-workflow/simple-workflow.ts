@@ -1,5 +1,4 @@
 import { SimpleWorkflowBase } from './simple-workflow.generated'
-import { CompleteWorkflow } from '@gamgee/run'
 import { trace } from '@opentelemetry/api'
 
 export type MyTaskPayload = {
@@ -14,7 +13,7 @@ export class SimpleWorkflow extends SimpleWorkflowBase {
         super()
     }
 
-    async myTask(payload: MyTaskPayload): Promise<CompleteWorkflow> {
+    async myTask(payload: MyTaskPayload): Promise<void> {
         trace.getActiveSpan()?.setAttribute('payload', payload.testId)
 
         if ((failures[payload.testId] ??= 0) < payload.failuresRequested) {
@@ -22,6 +21,6 @@ export class SimpleWorkflow extends SimpleWorkflowBase {
             throw new Error('Task failed successfully :)')
         }
 
-        return Promise.resolve(CompleteWorkflow)
+        return Promise.resolve()
     }
 }
