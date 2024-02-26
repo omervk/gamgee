@@ -1,4 +1,3 @@
-import { CompleteWorkflow } from '@gamgee/run'
 import { ConditionsWorkflowBase } from './conditions.generated'
 import { trace } from '@opentelemetry/api'
 

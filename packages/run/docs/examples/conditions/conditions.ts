@@ -1,4 +1,4 @@
-import { ConditionsWorkflowBase } from './conditions.generated'
+import { ChoiceOptions, ConditionsWorkflowBase } from './conditions.generated'
 
 export type DecidePayload = Record<string, never>
 export type LeftPayload = Record<string, never>
@@ -9,7 +9,7 @@ export class ConditionsWorkflow extends ConditionsWorkflowBase {
         super()
     }
 
-    decide(payload: DecidePayload) {
+    decide(payload: DecidePayload): ChoiceOptions {
         if (Math.random() < 0.5) {
             return Promise.resolve(this.choice.chooseLeft({}))
         } else {

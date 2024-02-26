@@ -5,6 +5,10 @@ import {WorkflowTask} from "@gamgee/interfaces/task";
 
 import {DecidePayload, LeftPayload, RightPayload} from "./conditions";
 
+export type ChoiceOptions =
+    | Promise<ReturnType<ConditionsWorkflowBase['choice']['chooseLeft']>>
+    | Promise<ReturnType<ConditionsWorkflowBase['choice']['chooseRight']>>
+
 export abstract class ConditionsWorkflowBase extends WorkflowBase {
     protected constructor() {
         super('ConditionsWorkflow');
@@ -19,7 +23,7 @@ export abstract class ConditionsWorkflowBase extends WorkflowBase {
         return task.instanceId;
     }
 
-    abstract decide(payload: DecidePayload): Promise<ReturnType<(typeof this.choice)['chooseLeft']>> | Promise<ReturnType<(typeof this.choice)['chooseRight']>>;
+    abstract decide(payload: DecidePayload): ChoiceOptions;
 
     private async invokeLeft(payload: LeftPayload): Promise<CompleteWorkflow> {
         await this.left(payload);
