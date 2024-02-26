@@ -8,6 +8,76 @@ An embedded framework to lend you a helping durable execution hand on your journ
 
 ![Build Status](https://github.com/omervk/gamgee/actions/workflows/build.yml/badge.svg)
 
+## TL;DR
+
+Take a MermaidJS State Diagram, implement what each state executes and the engine durably executes it.
+
+So write this:
+```mermaid
+---
+title: ConditionsWorkflow
+---
+
+stateDiagram-v2
+    state choice <<choice>>
+
+    direction LR
+    [*] --> decide
+    decide --> choice
+    choice --> left: chooseLeft
+    choice --> right: chooseRight
+    left --> [*]
+    right --> [*]
+```
+
+Only implement this:
+```typescript
+import { CompleteWorkflow } from '@gamgee/run'
+import { ConditionsWorkflowBase } from './conditions.generated'
+
+export type DecidePayload = Record<string, never>
+export type LeftPayload = Record<string, never>
+export type RightPayload = Record<string, never>
+
+export class ConditionsWorkflow extends ConditionsWorkflowBase {
+    constructor() {
+        super()
+    }
+
+    decide(payload: DecidePayload) {
+        if (Math.random() < 0.5) {
+            return Promise.resolve(this.choice.chooseLeft({}))
+        } else {
+            return Promise.resolve(this.choice.chooseRight({}))
+        }
+    }
+
+    left(payload: LeftPayload): Promise<CompleteWorkflow> {
+        console.log('We chose left')
+        return Promise.resolve(CompleteWorkflow)
+    }
+
+    right(payload: RightPayload): Promise<CompleteWorkflow> {
+        console.log('We chose right')
+        return Promise.resolve(CompleteWorkflow)
+    }
+}
+```
+
+Then invoke an instance of it:
+```typescript
+const workflow = new ConditionsWorkflow()
+await workflow.submit({ /* initial payload */ }, stateStore)
+
+const worker = new WorkflowWorker()
+const result = await worker.executeWaitingWorkflow(
+    stateStore,
+    { workflowType: workflow.workflowType },    // what to execute
+    FetchStrategy.Random,
+    1000,                                       // timeout
+)
+```
+
 ## Philosophy
 
 <img src="./resources/tradeoffs.jpg" width="256" height="auto" />
