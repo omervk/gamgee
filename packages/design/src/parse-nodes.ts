@@ -246,7 +246,7 @@ export function statementsToGraph(diagramStatements: Statement[]): {
     const states: { [name: string]: StateNode } = collectStates(supportedDiagramStatements, choices)
 
     const relationErrors = addRelations(
-        supportedDiagramStatements.filter(s => s.stmt === 'relation').map(s => s as RelationStatement),
+        supportedDiagramStatements.filter(s => s.stmt === 'relation'),
         states,
         choices,
     )

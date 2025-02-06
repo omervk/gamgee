@@ -16,7 +16,9 @@ export default class InMemoryStateStore implements StateStore {
         const oldTask = this.tasks[task.instanceId]
         if (!oldTask || oldTask.taskName !== fromTaskName) {
             return Promise.reject(
-                `Unable to find task by search criteria instanceId=${task.instanceId}, taskName=${fromTaskName}`,
+                new Error(
+                    `Unable to find task by search criteria instanceId=${task.instanceId}, taskName=${fromTaskName}`,
+                ),
             )
         }
 
