@@ -2,7 +2,7 @@ import InMemoryStateStore from '@gamgee/test/stateStores/in-memory'
 import { WorkflowWorker } from '../../src/worker'
 import { ConditionsWorkflow } from './conditions'
 import { FetchStrategy } from '@gamgee/interfaces/store'
-import { TestsTraceExporter } from '../tests-trace-exporter'
+import { TracedTestsSpanProcessor } from '../tests-trace-exporter'
 import { NodeSDK } from '@opentelemetry/sdk-node'
 import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { Span, SpanStatusCode, trace } from '@opentelemetry/api'
@@ -13,9 +13,9 @@ function randomString(): string {
 }
 
 describe('test conditions workflow', () => {
-    const testsTraceExporter = new TestsTraceExporter()
+    const processor = new TracedTestsSpanProcessor()
     const sdk: NodeSDK = new NodeSDK({
-        spanProcessor: new SimpleSpanProcessor(testsTraceExporter),
+        spanProcessors: [processor],
     })
     sdk.start()
 
@@ -57,13 +57,15 @@ describe('test conditions workflow', () => {
                 return span.spanContext()
             })
 
+        await processor.forceFlush()
+        
         expect(store.getStats()).toStrictEqual({
             taskUpdatesSeen: 3, // Create, ran choose, ran left and done
             tasksRemaining: 0,
             unrecoverableTasks: 0,
         })
-
-        const spansByTraceId = testsTraceExporter.getSpansByTraceId(parentSpanContext.traceId)
+        
+        const spansByTraceId = processor.getSpansByTraceId(parentSpanContext.traceId)
         expect(spansByTraceId).toMatchObject([
             {
                 name: 'ConditionsWorkflow.decide',

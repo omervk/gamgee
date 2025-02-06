@@ -3,7 +3,7 @@ import InMemoryStateStore from '@gamgee/test/stateStores/in-memory'
 import { WorkflowWorker } from '../../src/worker'
 import { FetchStrategy } from '@gamgee/interfaces/store'
 import { NodeSDK } from '@opentelemetry/sdk-node'
-import { TestsTraceExporter } from '../tests-trace-exporter'
+import { TracedTestsSpanProcessor } from '../tests-trace-exporter'
 import { Span, SpanStatusCode, trace } from '@opentelemetry/api'
 import { SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { expect } from '@jest/globals'
@@ -13,9 +13,9 @@ function randomString(): string {
 }
 
 describe('test simple workflow', () => {
-    const testsTraceExporter = new TestsTraceExporter()
+    const processor = new TracedTestsSpanProcessor()
     const sdk: NodeSDK = new NodeSDK({
-        spanProcessor: new SimpleSpanProcessor(testsTraceExporter),
+        spanProcessors: [processor],
     })
     sdk.start()
 
@@ -53,13 +53,15 @@ describe('test simple workflow', () => {
                 return span.spanContext()
             })
 
+        await processor.forceFlush()
+        
         expect(store.getStats()).toStrictEqual({
             taskUpdatesSeen: 2, // Create, done
             tasksRemaining: 0,
             unrecoverableTasks: 0,
         })
-
-        const spansByTraceId = testsTraceExporter.getSpansByTraceId(parentSpanContext.traceId)
+        
+        const spansByTraceId = processor.getSpansByTraceId(parentSpanContext.traceId)
         expect(spansByTraceId).toMatchObject([
             {
                 name: 'SimpleWorkflow.myTask',
@@ -112,13 +114,15 @@ describe('test simple workflow', () => {
                 return span.spanContext()
             })
 
+        await processor.forceFlush()
+
         expect(store.getStats()).toStrictEqual({
             taskUpdatesSeen: 3, // Create, retry, done
             tasksRemaining: 0,
             unrecoverableTasks: 0,
         })
 
-        const spansByTraceId = testsTraceExporter.getSpansByTraceId(parentSpanContext.traceId)
+        const spansByTraceId = processor.getSpansByTraceId(parentSpanContext.traceId)
         expect(spansByTraceId).toMatchObject([
             {
                 name: 'SimpleWorkflow.myTask',
@@ -179,13 +183,15 @@ describe('test simple workflow', () => {
                 return span.spanContext()
             })
 
+        await processor.forceFlush()
+
         expect(store.getStats()).toStrictEqual({
             taskUpdatesSeen: 3, // Create, retry, permanent failure
             tasksRemaining: 0,
             unrecoverableTasks: 1,
         })
 
-        const spansByTraceId = testsTraceExporter.getSpansByTraceId(parentSpanContext.traceId)
+        const spansByTraceId = processor.getSpansByTraceId(parentSpanContext.traceId)
         expect(spansByTraceId).toMatchObject([
             {
                 name: 'SimpleWorkflow.myTask',

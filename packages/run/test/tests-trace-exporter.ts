@@ -1,7 +1,7 @@
 import { ExportResult, ExportResultCode } from '@opentelemetry/core'
-import { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base'
+import { ReadableSpan, SimpleSpanProcessor, SpanExporter } from '@opentelemetry/sdk-trace-base'
 
-export class TestsTraceExporter implements SpanExporter {
+class TestsTraceExporter implements SpanExporter {
     private readonly spansByTraceId: { [traceId: string]: (ReadableSpan & { spanId: string })[] } = {}
 
     export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
@@ -24,5 +24,19 @@ export class TestsTraceExporter implements SpanExporter {
 
     getSpansByTraceId(traceId: string): (ReadableSpan & { spanId: string })[] {
         return this.spansByTraceId[traceId] || []
+    }
+}
+
+export class TracedTestsSpanProcessor extends SimpleSpanProcessor {
+    readonly exporter: TestsTraceExporter
+
+    constructor() {
+        const exporter = new TestsTraceExporter()
+        super(exporter)
+        this.exporter = exporter
+    }
+
+    getSpansByTraceId(traceId: string): (ReadableSpan & { spanId: string })[] {
+        return this.exporter.getSpansByTraceId(traceId)
     }
 }
