@@ -31,37 +31,42 @@ stateDiagram-v2
 ```
 
 Only implement this:
-```typescript
-import { ConditionsWorkflowBase } from './conditions.generated'
+* *conditions.types.ts* (the types of payloads steps send each other)
+  ```typescript
+  export type DecidePayload = Record<string, never>
+  export type LeftPayload = Record<string, never>
+  export type RightPayload = Record<string, never>
+  ```
 
-export type DecidePayload = Record<string, never>
-export type LeftPayload = Record<string, never>
-export type RightPayload = Record<string, never>
-
-export class ConditionsWorkflow extends ConditionsWorkflowBase {
-    constructor() {
-        super()
-    }
-
-    decide(payload: DecidePayload) {
-        if (Math.random() < 0.5) {
-            return Promise.resolve(this.choice.chooseLeft({}))
-        } else {
-            return Promise.resolve(this.choice.chooseRight({}))
-        }
-    }
-
-    left(payload: LeftPayload): Promise<void> {
-        console.log('We chose left')
-        return Promise.resolve()
-    }
-
-    right(payload: RightPayload): Promise<void> {
-        console.log('We chose right')
-        return Promise.resolve()
-    }
-}
-```
+* *conditions.ts* (the implementation of each step)
+  ```typescript
+  import { ConditionsWorkflowBase } from './conditions.generated'
+  import { DecidePayload, LeftPayload, RightPayload } from './conditions.types'
+  
+  export class ConditionsWorkflow extends ConditionsWorkflowBase {
+      constructor() {
+          super()
+      }
+  
+      decide(payload: DecidePayload) {
+          if (Math.random() < 0.5) {
+              return Promise.resolve(this.choice.chooseLeft({}))
+          } else {
+              return Promise.resolve(this.choice.chooseRight({}))
+          }
+      }
+  
+      left(payload: LeftPayload): Promise<void> {
+          console.log('We chose left')
+          return Promise.resolve()
+      }
+  
+      right(payload: RightPayload): Promise<void> {
+          console.log('We chose right')
+          return Promise.resolve()
+      }
+  }
+  ```
 
 Then invoke an instance of it:
 ```typescript

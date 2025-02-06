@@ -53,7 +53,7 @@ function titleNameFromHeader(header: string): string {
 }
 
 function fillScaffoldTemplate(
-    implementationRef: string,
+    payloadTypesRef: string,
     decisionVariables: string[],
     registerStepCalls: string[],
     functionDeclarationsCode: string[],
@@ -68,7 +68,7 @@ import {CompleteWorkflow, WrongTimingError, WorkflowBase} from "@gamgee/run";
 import {StateStore} from "@gamgee/interfaces/store";
 import {WorkflowTask} from "@gamgee/interfaces/task";
 
-import {${payloadNames.join(', ')}} from "${implementationRef}";
+import {${payloadNames.join(', ')}} from "${payloadTypesRef}";
 
 ${decisionTypes.join('\n\n')}
 
@@ -227,7 +227,7 @@ export function mermaidToScaffold(
 
     const baseName = path.basename(diagramFilePath, path.extname(diagramFilePath))
     const generatedFilePath = path.join(path.dirname(diagramFilePath), baseName + '.generated.ts')
-    const implementationRef = `${implementationRelativePath}/${baseName}`.replace('//', '/')
+    const implementationRef = `${implementationRelativePath}/${baseName}.types`.replace('//', '/')
 
     const contents = fillScaffoldTemplate(
         implementationRef,

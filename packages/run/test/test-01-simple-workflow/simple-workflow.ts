@@ -1,10 +1,6 @@
 import { SimpleWorkflowBase } from './simple-workflow.generated'
 import { trace } from '@opentelemetry/api'
-
-export type MyTaskPayload = {
-    testId: string
-    failuresRequested: number
-}
+import { MyTaskPayload } from './simple-workflow.types'
 
 const failures: { [id: MyTaskPayload['testId']]: number } = {}
 

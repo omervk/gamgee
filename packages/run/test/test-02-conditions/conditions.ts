@@ -1,22 +1,6 @@
 import { ConditionsWorkflowBase } from './conditions.generated'
 import { trace } from '@opentelemetry/api'
-
-export type DecidePayload = {
-    testId: string
-    choose: 'left' | 'right'
-    failuresRequested: {
-        decideFailures: number
-        leftFailures: number
-        rightFailures: number
-    }
-}
-
-export type LeftPayload = {
-    testId: string
-    failuresRequested: number
-}
-
-export type RightPayload = LeftPayload
+import { DecidePayload, LeftPayload, RightPayload } from './conditions.types'
 
 type Failures = { decide: number; left?: number; right?: number }
 

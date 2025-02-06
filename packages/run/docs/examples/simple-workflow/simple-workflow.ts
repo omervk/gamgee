@@ -1,7 +1,5 @@
 import { SimpleWorkflowBase } from './simple-workflow.generated'
-
-export type Task1Payload = string
-export type Task2Payload = string
+import { Task1Payload, Task2Payload } from './simple-workflow.types'
 
 export class SimpleWorkflow extends SimpleWorkflowBase {
     constructor() {

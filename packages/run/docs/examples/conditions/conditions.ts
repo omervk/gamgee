@@ -1,8 +1,5 @@
 import { ChoiceOptions, ConditionsWorkflowBase } from './conditions.generated'
-
-export type DecidePayload = Record<string, never>
-export type LeftPayload = Record<string, never>
-export type RightPayload = Record<string, never>
+import { DecidePayload, LeftPayload, RightPayload } from './conditions.types'
 
 export class ConditionsWorkflow extends ConditionsWorkflowBase {
     constructor() {
