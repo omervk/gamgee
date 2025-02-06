@@ -1,6 +1,6 @@
 # Context
 
-This directory exists for now, until version 11 of Mermaid officially releases with the standalone parser [@mermaid-js/parser](https://www.npmjs.com/package/@mermaid-js/parser). Once that's ready, we can replace the copy/pasted Jison syntax.
+This directory exists for now, until Mermaid has an official Langium-based parser in [@mermaid-js/parser](https://www.npmjs.com/package/@mermaid-js/parser). Once that's ready, we can replace the copy/pasted Jison syntax.
 
 # Contents
 
