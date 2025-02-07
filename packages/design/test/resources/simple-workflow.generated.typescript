@@ -3,7 +3,7 @@ import {CompleteWorkflow, WrongTimingError, WorkflowBase} from "@gamgee/run";
 import {StateStore} from "@gamgee/interfaces/store";
 import {WorkflowTask} from "@gamgee/interfaces/task";
 
-import {Task1Payload, Task2Payload} from "./simple-workflow";
+import {Task1Payload, Task2Payload} from "./simple-workflow.types";
 
 export abstract class SimpleWorkflowBase extends WorkflowBase {
     protected constructor() {

@@ -3,7 +3,7 @@ import {CompleteWorkflow, WrongTimingError, WorkflowBase} from "@gamgee/run";
 import {StateStore} from "@gamgee/interfaces/store";
 import {WorkflowTask} from "@gamgee/interfaces/task";
 
-import {DecidePayload, LeftPayload, RightPayload} from "./conditions";
+import {DecidePayload, LeftPayload, RightPayload} from "./conditions.types";
 
 export type ChoiceOptions =
     | Promise<ReturnType<ConditionsWorkflowBase['choice']['chooseLeft']>>
